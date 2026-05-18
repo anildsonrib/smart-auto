@@ -100,7 +100,7 @@ def _abrir_menu(s: requests.Session, codigo: str) -> str:
 
 def _baixar_periodo(s: requests.Session, espelho_url: str, ini: date, fim: date) -> str:
     """GET inicial p/ pegar hidden fields, depois POST com periodo ajustado."""
-    r = s.get(espelho_url, timeout=30, headers={
+    r = s.get(espelho_url, timeout=90, headers={
         "Referer": f"{BASE}/portal.csp",
     })
     # extrai TODOS os inputs hidden do form
@@ -117,7 +117,7 @@ def _baixar_periodo(s: requests.Session, espelho_url: str, ini: date, fim: date)
     action = re.search(r"<form[^>]*action=[\"']([^\"']+)[\"']", r.text, re.I)
     post_url = action.group(1) if action else espelho_url.split("?")[0]
     if post_url.startswith("/"): post_url = HOST + post_url
-    r2 = s.post(post_url, data=inputs, timeout=30, headers={
+    r2 = s.post(post_url, data=inputs, timeout=90, headers={
         "Referer": espelho_url,
         "Content-Type": "application/x-www-form-urlencoded",
     })
