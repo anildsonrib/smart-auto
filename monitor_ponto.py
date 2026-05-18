@@ -45,6 +45,12 @@ SYSTEMS = {
         "weekdays":  {0, 1, 2, 3},
         "downloader": "secullum",
     },
+    "pm": {  # MentorH (SIGP EBSERH) - escala de plantao 12x36
+        "id": "MentorH",
+        "expected":  ["07:00", "19:00"],
+        "weekdays":  {0, 1, 2, 3, 4, 5, 6},   # qualquer dia pode ser de plantao
+        "downloader": "mentorh",
+    },
 }
 DEFAULT_SYSTEM = "st"
 
@@ -327,6 +333,24 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
                 "punches":    d.get("marcacoes", []),
                 "is_workday": d["date"].weekday() in cfg["weekdays"] and not absent,
+            })
+        return dias
+    elif cfg["downloader"] == "mentorh":
+        import folha_mentorh
+        raw = folha_mentorh.baixar(ini, fim)
+        dias = []
+        for d in raw:
+            cells = d.get("raw", [])
+            ch_code  = (cells[1] if len(cells) > 1 else "").strip()
+            ocorrencia = " ".join(cells).upper()
+            absent  = _has_absence(cells)
+            sem_dados = "COLETA" in ocorrencia and ("NAO" in ocorrencia or "NÃO" in ocorrencia)
+            # dia de plantao = tem codigo de horario (CH) preenchido E sem ausencia/coleta-faltante
+            dias.append({
+                "date":       d["date"],
+                "weekday":    (d.get("weekday") or "")[:3].upper(),
+                "punches":    d.get("marcacoes", []),
+                "is_workday": bool(ch_code) and not absent and not sem_dados,
             })
         return dias
     else:
