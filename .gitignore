@@ -1,0 +1,28 @@
+# segredos
+.env
+.env.*
+*.pem
+*.key
+oci_api_key*
+
+# estado runtime
+monitor_state.json
+__pycache__/
+*.pyc
+
+# artefatos de debug / capturas
+captures/
+midia/
+waapi_apk/
+folha_ponto_*.pdf
+folha_ponto_*.html
+oracle_*.png
+oracle_dump.html
+oracle_snap.png
+
+# log/temp
+*.log
+tmp/
+
+# sessoes persistentes de browser
+active-sessions/

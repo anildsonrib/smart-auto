@@ -1,0 +1,16 @@
+[Unit]
+Description=Caca A1 Always Free (loop ate conseguir capacidade)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/smart_auto
+ExecStart=/home/ubuntu/venv/bin/python /home/ubuntu/smart_auto/provisionar_a1.py
+Restart=no
+StandardOutput=append:/home/ubuntu/smart_auto/caca_a1.log
+StandardError=append:/home/ubuntu/smart_auto/caca_a1.log
+
+[Install]
+WantedBy=multi-user.target

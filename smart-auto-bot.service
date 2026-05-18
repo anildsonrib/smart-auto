@@ -1,0 +1,17 @@
+[Unit]
+Description=Santi Smart Auto - Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/smart_auto
+ExecStart=/home/ubuntu/venv/bin/python /home/ubuntu/smart_auto/telegram_bot.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/ubuntu/smart_auto/bot.log
+StandardError=append:/home/ubuntu/smart_auto/bot.log
+
+[Install]
+WantedBy=multi-user.target

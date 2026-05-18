@@ -1,0 +1,8 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAn0+3CtEg3f4TU/CW8RD+m/cG4dHNubAk0VFSu7ovNX smart-auto@oci
