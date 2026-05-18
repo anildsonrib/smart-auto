@@ -19,6 +19,7 @@ folha_ponto_*.html
 oracle_*.png
 oracle_dump.html
 oracle_snap.png
+tg*.png
 
 # log/temp
 *.log
