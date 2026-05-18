@@ -45,7 +45,7 @@ SYSTEMS = {
         "weekdays":  {0, 1, 2, 3},
         "downloader": "secullum",
     },
-    "pm": {  # MentorH (SIGP EBSERH) - escala de plantao 12x36
+    "eb": {  # MentorH (SIGP EBSERH) - escala de plantao 12x36
         "id": "MentorH",
         "expected":  ["07:00", "19:00"],
         "weekdays":  {0, 1, 2, 3, 4, 5, 6},   # qualquer dia pode ser de plantao

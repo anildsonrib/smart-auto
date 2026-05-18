@@ -122,7 +122,7 @@ def send(chat_id: int, text: str):
     except Exception as e:
         print(f"[send-err] {e}")
 
-SYS_LABELS = {"st": "SANTI", "ss": "Sesa", "pm": "MentorH"}
+SYS_LABELS = {"st": "SANTI", "ss": "Sesa", "eb": "MentorH"}
 
 def parse_args_sistema(raw_args: list[str]) -> tuple[str | None, list[str]]:
     """Extrai sufixo de sistema (st/ss) dos args; retorna (sys|None, resto)."""
@@ -137,7 +137,7 @@ def parse_args_sistema(raw_args: list[str]) -> tuple[str | None, list[str]]:
 
 ERR_SUFIXO = (
     "⚠️ Sufixo de sistema obrigatorio.\n\n"
-    "Use `st` (SANTI), `ss` (Sesa) ou `pm` (MentorH) ao final do comando.\n"
+    "Use `st` (SANTI), `ss` (Sesa) ou `eb` (MentorH) ao final do comando.\n"
     "Exemplos:\n"
     "`/checar st`\n"
     "`/forcar 06/05 ss`\n"
@@ -278,8 +278,8 @@ def handle_command(chat_id: int, text: str):
              "*Sistemas suportados*\n"
              "`st` - SANTI (Senior HCM) | _padrao_\n"
              "`ss` - Sesa (Secullum)\n"
-             "`pm` - MentorH (SIGP EBSERH)\n\n"
-             "*Comandos* _(sufixo `st`/`ss`/`pm` obrigatorio)_\n"
+             "`eb` - MentorH (SIGP EBSERH)\n\n"
+             "*Comandos* _(sufixo `st`/`ss`/`eb` obrigatorio)_\n"
              "`/checar st` - checagem agora (respeita 24h + state)\n"
              "`/forcar DD/MM ss` - avalia um dia (ignora 24h e state)\n"
              "`/forcar DD/MM-DD/MM ss` - avalia um range\n"
@@ -330,7 +330,7 @@ def handle_command(chat_id: int, text: str):
         if sys_key is None:
             send(chat_id, ERR_SUFIXO); return
         if not date_args:
-            send(chat_id, "Uso: `/forcar DD/MM [st|ss|pm]`\nou `/forcar DD/MM-DD/MM [st|ss|pm]`")
+            send(chat_id, "Uso: `/forcar DD/MM [st|ss|eb]`\nou `/forcar DD/MM-DD/MM [st|ss|eb]`")
             return
         tokens = normalizar_tokens_data(date_args)
         try:
@@ -376,10 +376,10 @@ def handle_command(chat_id: int, text: str):
     send(chat_id, f"Comando desconhecido: `{cmd}`\nUse /ajuda")
 
 COMMANDS = [
-    ("checar",  "Checa pendencias. Use: /checar st|ss|pm"),
+    ("checar",  "Checa pendencias. Use: /checar st|ss|eb"),
     ("forcar",  "Avalia 1 dia ou range. Ex: /forcar 06/05 ss"),
-    ("status",  "Lista dias notificados. Use: /status st|ss|pm"),
-    ("resetar", "Apaga state. Use: /resetar st|ss|pm"),
+    ("status",  "Lista dias notificados. Use: /status st|ss|eb"),
+    ("resetar", "Apaga state. Use: /resetar st|ss|eb"),
     ("ajuda",   "Lista de comandos"),
 ]
 
