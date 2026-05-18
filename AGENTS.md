@@ -2,9 +2,9 @@
 
 Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independente com gatilho proprio.
 
-## 1. Cron Monitor (`monitor_ponto.py --system <st|ss>`)
+## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
-- **Gatilho**: cron na VM Oracle. `sex 15h` (st) e `sex 21h` (ss).
+- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb).
 - **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao dupla (Telegram + WhatsApp) somente se houver pendencias novas.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
@@ -55,6 +55,22 @@ HTTP puro contra ASP.NET WebForms:
 
 Parse via regex (`<tr>` -> `<td>`, stripping de tags aninhadas `<a><font>`).
 
+### 4.3 MentorH (`folha_mentorh.py`)
+
+HTTP puro contra Intersystems Cache CSP:
+1. GET `/portal/novo/portal.csp` -> 302 `/index.csp` (cookies de sessao)
+2. Extrai WEVENT de `mountAjaxData('<TOKEN>', $('#login').val()...)` no HTML
+3. POST `%CSP.Broker.cls` com `WARGC=3&WEVENT=...&WARG_1=cpf&WARG_2=senha&WARG_3=`
+4. GET `/portal.csp` autenticado -> extrai WEVENT de `function acessarMenu`
+5. POST `%CSP.Broker.cls` com `WARG_1=100.3.6.1` -> resposta JS contem URL do espelho com CSPToken
+6. GET espelho (hidden fields), POST com `atualPrimData`/`atualUltData` em `$HOROLOG` (dias desde 1840-12-31)
+
+Parse via regex de `<tr>`/`<td>`. Detecta turno por dia (diurno sex/dom vs noturno extra) e injeta `expected` por dia no dispatcher.
+
+### 4.4 Cache uniforme
+
+Todos os downloaders mantem cache JSON em `cache/<sistema>_<ini>_<fim>.json` com TTL 600s. Hit emite `[cache]`; miss emite `[login]` + `[download]`. Senior tambem mantem cache do PDF cru em `folha_ponto_*.pdf` para debug.
+
 ## 5. Contratos entre agentes
 
 ### Estado compartilhado
@@ -63,7 +79,8 @@ Parse via regex (`<tr>` -> `<td>`, stripping de tags aninhadas `<a><font>`).
 ```json
 {
   "st": { "ja_notificados": ["2026-05-04", "2026-05-06"] },
-  "ss": { "ja_notificados": ["2026-04-30"] }
+  "ss": { "ja_notificados": ["2026-04-30"] },
+  "eb": { "ja_notificados": ["2026-05-08"] }
 }
 ```
 

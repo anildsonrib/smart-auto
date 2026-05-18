@@ -11,10 +11,12 @@ Toda regra especifica de sistema vive em um dict no topo do arquivo:
 
 ```python
 SYSTEMS = {
-    "st": {"id": "SANTI", "expected": ["07:00","10:00","10:15","13:00"],
+    "st": {"id": "SANTI",   "expected": ["07:00","10:00","10:15","13:00"],
            "weekdays": {0,1,2,3}, "downloader": "senior"},
-    "ss": {"id": "Sesa",  "expected": ["14:00","20:00"],
+    "ss": {"id": "Sesa",    "expected": ["14:00","20:00"],
            "weekdays": {0,1,2,3}, "downloader": "secullum"},
+    "eb": {"id": "MentorH", "expected": ["07:00","19:00"],
+           "weekdays": {0,1,2,3,4,5,6}, "downloader": "mentorh"},
 }
 DELAY_HOURS_AFTER_LAST = 24
 FORCE_TODAY_GRACE_HOURS = 4   # /forcar hoje: so cobra horarios <= agora-4h
@@ -68,6 +70,26 @@ def avaliar_dias(dias, sys_cfg, agora, force_day=None, force_range=None):
 
 Motivo da carencia: rodar `/forcar` durante o expediente nao deve cobrar marcacoes que o usuario ainda nao teve a chance de bater.
 
+## Override de expected por dia
+
+Sistemas com escala variavel (ex: MentorH 12x36) podem ter `expected` diferente por dia. O downloader injeta `d["expected"]` na lista retornada por `baixar_dias`, e `avaliar_dias` usa `d["expected"]` se presente, senao cai no default do sistema:
+
+```python
+expected_eff = d.get("expected") or sys_cfg["expected"]
+```
+
+A carencia de 4h continua sendo aplicada sobre `expected_eff`.
+
+## Cache uniforme
+
+Cada downloader mantem cache JSON proprio em `cache/<sistema>_<ini>_<fim>.json` com TTL 600s. Markers obrigatorios:
+
+- `[cache]` no hit
+- `[login]` + `[download]` no miss
+- `[parse]` emitido pelo monitor apos baixar_dias
+
+Esses sao os pontos que `telegram_bot.py:MARCOS` mapeia para texto humano.
+
 Detector de ausencia em `_has_absence(raw_cells)`: case-insensitive em FERIAS|ABO|FOLGA|FERIADO.
 
 ## State
@@ -75,7 +97,7 @@ Detector de ausencia em `_has_absence(raw_cells)`: case-insensitive em FERIAS|AB
 `monitor_state.json` namespaced por sistema:
 
 ```json
-{ "st": {"ja_notificados": [...]}, "ss": {"ja_notificados": [...]} }
+{ "st": {"ja_notificados": [...]}, "ss": {"ja_notificados": [...]}, "eb": {"ja_notificados": [...]} }
 ```
 
 `load_state(sys_key)` / `save_state(sys_key, dict)`. Migracao de schema antigo (raiz flat) deve ser idempotente.

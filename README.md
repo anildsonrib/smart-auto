@@ -6,10 +6,11 @@ Monitor automatizado de folha de ponto. Le sistemas de RH externos, detecta marc
 
 ## Sistemas suportados
 
-| sufixo | Identificador | Origem                     | Marcacoes/dia      | Dias uteis  |
-|--------|---------------|----------------------------|---------------------|-------------|
-| `st`   | SANTI         | Senior HCM (Rubi/Conector) | 4 (07/10/10:15/13)  | seg-qui     |
-| `ss`   | Sesa          | Secullum Ponto 4 (ASP.NET) | 2 (14/20)           | seg-qui     |
+| sufixo | Identificador | Origem                          | Marcacoes/dia              | Dias uteis             |
+|--------|---------------|---------------------------------|----------------------------|------------------------|
+| `st`   | SANTI         | Senior HCM (Rubi/Conector)      | 4 (07/10/10:15/13)         | seg-qui                |
+| `ss`   | Sesa          | Secullum Ponto 4 (ASP.NET)      | 2 (14/20)                  | seg-qui                |
+| `eb`   | MentorH       | SIGP EBSERH (Intersystems CSP)  | 2 (07/19 diurno; 19/07 not)| sex+dom + plantao noite|
 
 Marcacoes podem ocorrer antes ou depois dos horarios padrao - o sistema alinha sequencialmente via DP (programacao dinamica) e considera pendencia somente quando o numero de marcacoes do dia for menor que o esperado.
 
@@ -53,6 +54,7 @@ Saidas:
 | `monitor_ponto.py`      | Orquestrador multi-sistema, avaliacao de pendencias, notificacoes |
 | `folha_ponto.py`        | Download/parse da folha Senior (3 requests: EXESENHA -> ENTRANCEREL -> EXEREL) |
 | `folha_secullum.py`     | Login + scrape Secullum Ponto 4 (HTTP puro, sem browser) |
+| `folha_mentorh.py`      | Login + scrape SIGP EBSERH/MentorH (HTTP puro via %CSP.Broker.cls) |
 | `telegram_bot.py`       | Long-poll do Telegram, parse de comandos, streaming de saida |
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
@@ -79,6 +81,9 @@ WAAPI_PASSWORD=...
 SECULLUM_BASE_URL=http://.../Ponto4/
 SECULLUM_USERNAME=...
 SECULLUM_PASSWORD=...
+MENTORH_BASE_URL=https://sigp.ebserh.gov.br/csp/ebserh/portal/novo/portal.csp
+MENTORH_USERNAME=...
+MENTORH_PASSWORD=...   # entre aspas se contiver `#`
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 CALLMEBOT_PHONE=55XXYYYYYYYYY
@@ -99,6 +104,7 @@ python telegram_bot.py
 # crontab -e
 0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st
 0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss
+0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb
 
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
@@ -106,7 +112,7 @@ sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao mig
 
 ## Comandos do bot
 
-Todos exigem sufixo `st` ou `ss` (excecao: `/ajuda`).
+Todos exigem sufixo `st`, `ss` ou `eb` (excecao: `/ajuda`).
 
 | Comando                       | Descricao |
 |-------------------------------|-----------|

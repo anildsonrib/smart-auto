@@ -21,8 +21,9 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
 
 - Suportar N sistemas de ponto via dicionario `SYSTEMS = {sufixo: {...}}`
 - Cada sistema define: identificador visivel, horarios esperados, dias uteis, downloader
-- State persistido por sistema (chave `st`/`ss`)
+- State persistido por sistema (chaves atuais: `st`/`ss`/`eb`)
 - Comandos no chatbot exigem sufixo explicito - sem default
+- Cada downloader expoe `baixar(ini, fim) -> list[dict]` e mantem cache JSON de 600s em `cache/`
 
 ### 4.2 Avaliacao de pendencias
 
@@ -34,6 +35,7 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
   - dias com ausencia justificada (FERIAS, ABONO, FOLGA, FERIADO)
   - ultimas N horas (`DELAY_HOURS_AFTER_LAST = 24`) na rotina normal
 - Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de `FORCE_TODAY_GRACE_HOURS = 4`: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda tem tempo de bater.
+- Sistemas com escala variavel (ex: MentorH plantao 12x36) podem fornecer `expected` por dia via dispatcher (`baixar_dias`); o orquestrador respeita esse override antes do default do sistema. Permite detectar plantao noturno (entrada 19h dia X, saida 07h dia X+1) sem falso positivo.
 
 ### 4.3 Notificacao
 
@@ -56,6 +58,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 
 - `sex 15h`: roda `--system st`
 - `sex 21h`: roda `--system ss`
+- `seg 06h`: roda `--system eb` (cobre plantao de domingo + extras da semana)
 - Notificacao dupla: Telegram + WhatsApp
 
 ### 4.6 Caca A1 (opcional)
