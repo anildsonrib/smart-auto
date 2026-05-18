@@ -1,5 +1,7 @@
 # smart_auto
 
+Repo: https://github.com/<usuario>sonrib/smart-auto
+
 Monitor automatizado de folha de ponto. Le sistemas de RH externos, detecta marcacoes faltantes e notifica via Telegram (chatbot interativo) e WhatsApp (CallMeBot, somente envio).
 
 ## Sistemas suportados
