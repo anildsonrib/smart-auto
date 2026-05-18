@@ -190,14 +190,13 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
     hoje = agora.date()
     for d in dias:
         expected_eff = expected
-        if force_range:
-            ini, fim = force_range
-            if not (ini <= d["date"] <= fim): continue
-            if d["date"] >= hoje: continue  # ignora hoje (sem chance de bater) e datas futuras
-            if not d["is_workday"]: continue
-        elif force_day:
-            if d["date"] != force_day: continue
-            if d["date"] > hoje: continue  # ignora datas futuras
+        if force_range or force_day:
+            if force_range:
+                ini, fim = force_range
+                if not (ini <= d["date"] <= fim): continue
+            else:
+                if d["date"] != force_day: continue
+            if d["date"] > hoje: continue                     # ignora datas futuras
             if d["date"].weekday() not in weekdays: continue  # respeita dias de trabalho do sistema
             if not d["is_workday"]: continue                  # respeita ABO/FERIAS/folga
             if d["date"] == hoje:
