@@ -21,6 +21,9 @@ oracle_dump.html
 oracle_snap.png
 tg*.png
 
+# cache local de downloads
+cache/
+
 # log/temp
 *.log
 tmp/

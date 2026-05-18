@@ -11,8 +11,10 @@ Fluxo:
 
 Sem browser. Roda em qualquer maquina com Python + requests.
 """
+import json
 import re
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -41,6 +43,8 @@ USER   = ENV_VARS.get("MENTORH_USERNAME", "")
 PWD    = ENV_VARS.get("MENTORH_PASSWORD", "")
 MENU   = "100.3.6.1"  # Folha de Frequencia
 EPOCH  = date(1840, 12, 31)  # Intersystems Cache $HOROLOG
+CACHE_DIR     = ROOT / "cache"
+CACHE_SECONDS = 600  # 10 min: mesmo TTL do PDF do Senior
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148"
 
@@ -151,18 +155,43 @@ def _parse(html: str, ini: date, fim: date) -> list[dict]:
         })
     return out
 
+def _cache_path(ini: date, fim: date) -> Path:
+    return CACHE_DIR / f"mentorh_{ini.isoformat()}_{fim.isoformat()}.json"
+
+def _load_cache(ini: date, fim: date) -> Optional[list[dict]]:
+    p = _cache_path(ini, fim)
+    if not p.exists(): return None
+    age = time.time() - p.stat().st_mtime
+    if age >= CACHE_SECONDS:
+        return None
+    data = json.loads(p.read_text(encoding="utf-8"))
+    for d in data:
+        d["date"] = date.fromisoformat(d["date"])
+    print(f"[cache] reusando {p.name} (idade {int(age)}s)")
+    return data
+
+def _save_cache(ini: date, fim: date, dias: list[dict]):
+    CACHE_DIR.mkdir(exist_ok=True)
+    serial = [{**d, "date": d["date"].isoformat()} for d in dias]
+    _cache_path(ini, fim).write_text(json.dumps(serial, ensure_ascii=False), encoding="utf-8")
+
 def baixar(ini: date, fim: date) -> list[dict]:
     print(f"[mentorh] periodo {ini.isoformat()} a {fim.isoformat()}")
+    cached = _load_cache(ini, fim)
+    if cached is not None:
+        print(f"[mentorh] {len(cached)} linha(s) do cache")
+        return cached
     if not USER or not PWD:
         raise RuntimeError("MENTORH_USERNAME/MENTORH_PASSWORD nao configurados no .env")
     s = _sess()
     _login(s)
     print("[mentorh] abrindo menu Folha de Frequencia")
     espelho = _abrir_menu(s, MENU)
-    print(f"[mentorh] baixando espelho")
+    print(f"[download] baixando espelho")
     html = _baixar_periodo(s, espelho, ini, fim)
     dias = _parse(html, ini, fim)
     print(f"[mentorh] {len(dias)} linha(s) extraidas")
+    _save_cache(ini, fim, dias)
     return dias
 
 if __name__ == "__main__":
