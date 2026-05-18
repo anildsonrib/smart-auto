@@ -13,6 +13,8 @@ Monitor automatizado de folha de ponto. Le sistemas de RH externos, detecta marc
 
 Marcacoes podem ocorrer antes ou depois dos horarios padrao - o sistema alinha sequencialmente via DP (programacao dinamica) e considera pendencia somente quando o numero de marcacoes do dia for menor que o esperado.
 
+Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de 4h: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda nao bateu o ponto.
+
 ## Arquitetura
 
 ```

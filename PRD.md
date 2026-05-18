@@ -32,7 +32,8 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
   - dias futuros
   - dias nao-uteis do sistema
   - dias com ausencia justificada (FERIAS, ABONO, FOLGA, FERIADO)
-  - ultimas N horas (`DELAY_HOURS_AFTER_LAST = 24`)
+  - ultimas N horas (`DELAY_HOURS_AFTER_LAST = 24`) na rotina normal
+- Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de `FORCE_TODAY_GRACE_HOURS = 4`: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda tem tempo de bater.
 
 ### 4.3 Notificacao
 
@@ -48,6 +49,8 @@ Comandos: `/checar`, `/forcar <data|range>`, `/status`, `/resetar`, `/ajuda`.
 Formatos de data flexiveis: `DD/MM`, `DDMM`, `DD-MM`, `DDMMAAAA`, range com dash. Aceita cross-month.
 
 Feedback de progresso via markers (`[cache]`, `[download]`, `[login]`, `[3/3 EXEREL]`, `[parse]`) que o bot transforma em mensagens humanas atualizadas durante a execucao.
+
+Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_error()` (HTTP 5xx -> "indisponivel", 401/403 -> "credenciais", timeout -> "demorou demais", DNS/SSL/conexao recusada, login invalido). Traceback Python nunca e exposto ao usuario.
 
 ### 4.5 Cron na VM
 

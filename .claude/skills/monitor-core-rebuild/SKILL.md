@@ -17,6 +17,7 @@ SYSTEMS = {
            "weekdays": {0,1,2,3}, "downloader": "secullum"},
 }
 DELAY_HOURS_AFTER_LAST = 24
+FORCE_TODAY_GRACE_HOURS = 4   # /forcar hoje: so cobra horarios <= agora-4h
 PDF_CACHE_SECONDS = 600
 ```
 
@@ -38,24 +39,34 @@ def _alinhar(obs, exp):
 
 ## Filtros
 
+`force_day` e `force_range` compartilham o mesmo bloco:
+
 ```python
-def avaliar_dias(dias, sys_cfg, hoje, force_day=None, force_range=None):
+def avaliar_dias(dias, sys_cfg, agora, force_day=None, force_range=None):
+    hoje = agora.date()
     for d in dias:
-        if force_day:
-            if d["date"] != force_day: continue
+        expected_eff = sys_cfg["expected"]
+        if force_range or force_day:
+            if force_range:
+                ini, fim = force_range
+                if not (ini <= d["date"] <= fim): continue
+            else:
+                if d["date"] != force_day: continue
             if d["date"] > hoje: continue
             if d["date"].weekday() not in sys_cfg["weekdays"]: continue
             if not d["is_workday"]: continue
-        elif force_range:
-            ini, fim = force_range
-            if not (ini <= d["date"] <= fim): continue
-            if d["date"] > hoje: continue
-            if d["date"].weekday() not in sys_cfg["weekdays"]: continue
-            if not d["is_workday"]: continue
+            if d["date"] == hoje:
+                limite = agora - timedelta(hours=FORCE_TODAY_GRACE_HOURS)
+                expected_eff = [h for h in sys_cfg["expected"]
+                                if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= limite]
+                if not expected_eff: continue
         else:
             # rotina normal: respeita ja_notificados + DELAY_HOURS_AFTER_LAST
             ...
+        faltando = faltas_no_dia(d["punches"], expected_eff)
 ```
+
+Motivo da carencia: rodar `/forcar` durante o expediente nao deve cobrar marcacoes que o usuario ainda nao teve a chance de bater.
 
 Detector de ausencia em `_has_absence(raw_cells)`: case-insensitive em FERIAS|ABO|FOLGA|FERIADO.
 

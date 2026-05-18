@@ -77,6 +77,24 @@ def md_to_html(t):
 
 Sempre enviar com `parse_mode=HTML`.
 
+## Mensagens de erro
+
+Nunca exponha traceback Python ao usuario. Capture stdout/stderr do subprocess e passe por `friendly_error(raw)` antes de enviar. Mapeie por padrao:
+
+| Sinal no raw                              | Mensagem                                |
+|-------------------------------------------|------------------------------------------|
+| `HTTPError` + codigo 5xx                  | "Sistema indisponivel (HTTP N)"         |
+| HTTP 401/403                              | "Acesso negado — credenciais expiradas" |
+| HTTP 404                                  | "URL nao encontrada"                    |
+| `ConnectionError` / refused / reset       | "Sem conexao com o sistema"             |
+| `getaddrinfo` / `Name or service`         | "DNS falhou"                            |
+| `timeout` / `timed out`                   | "Servidor demorou demais"               |
+| `SSLError` / `certificate`                | "Erro de certificado SSL"               |
+| login + (invalid/incorret/senha)          | "Login invalido — revise .env"          |
+| Fallback                                  | `Tipo: msg` em uma linha                |
+
+Extrair o nome amigavel do sistema do raw via regex `\[system\]\s+\S+\s+\(([^)]+)\)` (capta o id como `SANTI`/`Sesa`).
+
 ## Menu (setMyCommands)
 
 Registrar uma vez no setup:

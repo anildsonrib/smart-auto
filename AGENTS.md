@@ -18,6 +18,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 - **Restricao**: ignora mensagens fora do `TELEGRAM_CHAT_ID` configurado.
 - **Modo de parse**: HTML (workaround do bug do Markdown legado que comia primeira linha bold-only).
 - **Saida**: mensagens incrementais com markers convertidos em texto humano.
+- **Erros**: `friendly_error()` traduz traceback em mensagens claras (HTTP 5xx, 401/403, 404, timeout, DNS, conexao recusada, SSL, login invalido, PDF vazio). Fallback exibe so `Tipo: msg` em uma linha.
 
 ## 3. Hunter A1 (`provisionar_a1.py` via `caca-a1.service`)
 
@@ -80,8 +81,8 @@ Parse via regex (`<tr>` -> `<td>`, stripping de tags aninhadas `<a><font>`).
 
 ```
 --system st|ss              (obrigatorio)
---force-day DD/MM[/AAAA]    (avalia 1 dia, ignora state)
---force-range DD/MM-DD/MM   (avalia range, ignora state)
+--force-day YYYY-MM-DD      (avalia 1 dia, ignora state; hoje usa carencia 4h)
+--force-range YYYY-MM-DD YYYY-MM-DD  (avalia range, ignora state; hoje usa carencia 4h)
 --no-whatsapp               (suprime CallMeBot)
 ```
 
