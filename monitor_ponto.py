@@ -198,7 +198,8 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
     weekdays = sys_cfg["weekdays"]
     hoje = agora.date()
     for d in dias:
-        expected_eff = expected
+        # Override per-day (ex: MentorH escala variavel - dia/noite/folga)
+        expected_eff = d.get("expected") or expected
         if force_range or force_day:
             if force_range:
                 ini, fim = force_range
@@ -211,7 +212,7 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
             if d["date"] == hoje:
                 # so cobra marcacoes esperadas ha pelo menos FORCE_TODAY_GRACE_HOURS
                 limite = agora - timedelta(hours=FORCE_TODAY_GRACE_HOURS)
-                expected_eff = [h for h in expected
+                expected_eff = [h for h in expected_eff
                                 if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= limite]
                 if not expected_eff: continue
         else:
@@ -345,12 +346,25 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
             ocorrencia = " ".join(cells).upper()
             absent  = _has_absence(cells)
             sem_dados = "COLETA" in ocorrencia and ("NAO" in ocorrencia or "NÃO" in ocorrencia)
-            # dia de plantao = tem codigo de horario (CH) preenchido E sem ausencia/coleta-faltante
+            punches = d.get("marcacoes", [])
+            wk = d["date"].weekday()  # 0=seg ... 4=sex ... 6=dom
+            # Escala MentorH:
+            #  - regular: sex/dom 07:00-19:00 (diurno)
+            #  - extra:   noite (qualquer dia) 19:00 dia X -> 07:00 dia X+1
+            # Detecta noite quando a primeira marcacao do dia e >= 17:00
+            primeira = int(punches[0].split(":")[0]) if punches else None
+            if primeira is not None and primeira >= 17:
+                expected_dia = ["19:00"]                          # so a entrada cabe no dia
+            elif primeira is not None and primeira < 12 and wk not in (4, 6):
+                expected_dia = ["07:00"]                          # saida de plantao da noite anterior
+            else:
+                expected_dia = ["07:00", "19:00"]                 # diurno padrao (sex/dom)
             dias.append({
                 "date":       d["date"],
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
-                "punches":    d.get("marcacoes", []),
+                "punches":    punches,
                 "is_workday": bool(ch_code) and not absent and not sem_dados,
+                "expected":   expected_dia,
             })
         return dias
     else:
