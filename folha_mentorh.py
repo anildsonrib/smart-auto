@@ -69,7 +69,7 @@ def _sess() -> requests.Session:
     return s
 
 def _login(s: requests.Session):
-    print("[mentorh] login...")
+    print("[login] mentorh")
     r = s.get(f"{BASE}/portal.csp", timeout=20, allow_redirects=True)
     m = re.search(r"mountAjaxData\('([^']+)',\$\('#login'\)\.val\(\)", r.text)
     if not m: raise RuntimeError("[mentorh] WEVENT de login nao encontrado")
@@ -176,21 +176,17 @@ def _save_cache(ini: date, fim: date, dias: list[dict]):
     _cache_path(ini, fim).write_text(json.dumps(serial, ensure_ascii=False), encoding="utf-8")
 
 def baixar(ini: date, fim: date) -> list[dict]:
-    print(f"[mentorh] periodo {ini.isoformat()} a {fim.isoformat()}")
     cached = _load_cache(ini, fim)
     if cached is not None:
-        print(f"[mentorh] {len(cached)} linha(s) do cache")
         return cached
     if not USER or not PWD:
         raise RuntimeError("MENTORH_USERNAME/MENTORH_PASSWORD nao configurados no .env")
     s = _sess()
     _login(s)
-    print("[mentorh] abrindo menu Folha de Frequencia")
+    print(f"[download] mentorh espelho {ini.isoformat()} a {fim.isoformat()}")
     espelho = _abrir_menu(s, MENU)
-    print(f"[download] baixando espelho")
     html = _baixar_periodo(s, espelho, ini, fim)
     dias = _parse(html, ini, fim)
-    print(f"[mentorh] {len(dias)} linha(s) extraidas")
     _save_cache(ini, fim, dias)
     return dias
 

@@ -70,7 +70,7 @@ def login() -> requests.Session:
     r2.raise_for_status()
     if "lnkLogin" in r2.text or "pgLogin.aspx" in r2.url:
         raise RuntimeError("Login Secullum falhou - verificar credenciais")
-    print(f"[login] OK - URL={r2.url[-30:]}")
+    print(f"[login] secullum (url={r2.url[-30:]})")
     return s
 
 def baixar_periodo(s: requests.Session, ini: date, fim: date) -> str:
@@ -186,7 +186,7 @@ def baixar(ini: date | None = None, fim: date | None = None):
     cached = _load_cache(ini, fim)
     if cached is not None:
         return cached
-    print(f"[download] baixando folha Secullum {ini} a {fim}")
+    print(f"[download] secullum {ini} a {fim}")
     s = login()
     html = baixar_periodo(s, ini, fim)
     dias = parse_html(html, ini.year)
