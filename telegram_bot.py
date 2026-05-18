@@ -104,7 +104,7 @@ def md_to_html(text: str) -> str:
     # `inline code`
     out = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", out)
     # *bold* (nao captura ** ou em final/inicio de palavra grudado)
-    out = re.sub(r"\*([^\*\n]+?)\*", r"<b>\1</b>", out)
+    out = re.sub(r"\*([^\*\n]+?)\*", r"*\1*", out)
     # _italic_
     out = re.sub(r"_([^_\n]+?)_", r"<i>\1</i>", out)
     return out
@@ -175,6 +175,63 @@ def run_monitor(args: list[str], chat_id: int | None = None) -> str:
     except Exception as e:
         return f"❌ Erro: `{e}`"
 
+def _sistema_da_saida(raw: str) -> str:
+    import re as _re
+    m = _re.search(r"\[system\]\s+\S+\s+\(([^)]+)\)", raw)
+    return m.group(1) if m else "o sistema de ponto"
+
+def friendly_error(raw: str) -> str:
+    """Converte traceback do monitor em mensagem clara para o usuario."""
+    import re as _re
+    sistema = _sistema_da_saida(raw)
+    low = raw.lower()
+
+    # HTTP do servidor de ponto
+    m = _re.search(r"(\d{3})\s+(server error|client error|.*for url:\s*([^\s'\"]+))", raw, _re.I)
+    if "httperror" in low or " server error" in low:
+        codigo = m.group(1) if m else "?"
+        if codigo.startswith("5"):
+            return (f"⚠️ *{sistema} indisponivel*\n\n"
+                    f"O servidor respondeu HTTP {codigo} (erro interno).\n"
+                    f"Tente de novo em alguns minutos.")
+        if codigo in ("401", "403"):
+            return (f"⚠️ *Acesso negado em {sistema}*\n\n"
+                    f"Credenciais podem ter expirado (HTTP {codigo}).\n"
+                    f"Verifique usuario/senha no .env.")
+        if codigo == "404":
+            return (f"⚠️ *URL nao encontrada em {sistema}* (HTTP 404).\n"
+                    f"O endereco do sistema pode ter mudado.")
+        return f"⚠️ *{sistema}* respondeu HTTP {codigo}. Tente mais tarde."
+
+    # Rede / DNS / timeout
+    if "connectionerror" in low or "connection refused" in low or "connection reset" in low:
+        return (f"⚠️ *Sem conexao com {sistema}*\n\n"
+                f"O servidor recusou a conexao ou esta fora do ar.")
+    if "name or service not known" in low or "nodename nor servname" in low or "getaddrinfo failed" in low:
+        return (f"⚠️ *DNS falhou para {sistema}*\n\n"
+                f"Nao consegui resolver o endereco do servidor.")
+    if "timeout" in low or "timed out" in low:
+        return (f"⏱️ *{sistema} demorou demais para responder*\n\n"
+                f"Servidor lento ou instavel. Tente novamente.")
+    if "sslerror" in low or "certificate" in low:
+        return (f"⚠️ *Erro de certificado SSL em {sistema}*.")
+
+    # Login invalido (sem HTTP)
+    if "login" in low and ("invalid" in low or "incorret" in low or "senha" in low):
+        return (f"⚠️ *Login invalido em {sistema}*\n\nRevise usuario/senha no .env.")
+
+    # PDF/parser
+    if "pdfplumber" in low or "pdf" in low and "vazio" in low:
+        return f"⚠️ Nao consegui ler o PDF da folha de {sistema}."
+
+    # Fallback - tipo da exception se conseguir extrair
+    m2 = _re.search(r"([A-Za-z_][\w.]*Error|Exception):\s*(.+)", raw)
+    if m2:
+        tipo, msg = m2.group(1), m2.group(2).strip()
+        if len(msg) > 160: msg = msg[:160] + "..."
+        return f"❌ *Falha em {sistema}*\n\n`{tipo}: {msg}`"
+    return f"❌ *Falha em {sistema}*. Tente novamente em alguns minutos."
+
 def format_summary(raw: str, elapsed: float) -> str:
     """Converte o stdout do monitor em mensagem amigavel."""
     rodape = f"\n\n_{elapsed:.1f}s_"
@@ -199,9 +256,7 @@ def format_summary(raw: str, elapsed: float) -> str:
 
     # 3. Erro
     if "[erro]" in lower or "traceback" in lower or "exception" in lower:
-        # ultimas 5 linhas pra dar uma dica
-        tail = "\n".join(raw.strip().splitlines()[-5:])
-        return f"❌ Falhou:\n```\n{tail}\n```" + rodape
+        return friendly_error(raw) + rodape
 
     # 4. Fallback - bloco bruto truncado
     if len(raw) > 1500:
