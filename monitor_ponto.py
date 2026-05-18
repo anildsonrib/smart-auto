@@ -50,6 +50,9 @@ DEFAULT_SYSTEM = "st"
 
 # Aguardar N horas apos o ultimo horario esperado antes de avaliar o dia
 DELAY_HOURS_AFTER_LAST = 24
+# Em /forcar no dia corrente, so considera marcacoes esperadas que estao
+# ha pelo menos N horas atras (da tempo do usuario bater o ponto).
+FORCE_TODAY_GRACE_HOURS = 4
 # Reusa PDF do mes corrente se foi baixado nos ultimos N segundos
 PDF_CACHE_SECONDS = 600
 
@@ -186,16 +189,23 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
     weekdays = sys_cfg["weekdays"]
     hoje = agora.date()
     for d in dias:
+        expected_eff = expected
         if force_range:
             ini, fim = force_range
             if not (ini <= d["date"] <= fim): continue
-            if d["date"] > hoje: continue  # ignora datas futuras
+            if d["date"] >= hoje: continue  # ignora hoje (sem chance de bater) e datas futuras
             if not d["is_workday"]: continue
         elif force_day:
             if d["date"] != force_day: continue
             if d["date"] > hoje: continue  # ignora datas futuras
             if d["date"].weekday() not in weekdays: continue  # respeita dias de trabalho do sistema
             if not d["is_workday"]: continue                  # respeita ABO/FERIAS/folga
+            if d["date"] == hoje:
+                # so cobra marcacoes esperadas ha pelo menos FORCE_TODAY_GRACE_HOURS
+                limite = agora - timedelta(hours=FORCE_TODAY_GRACE_HOURS)
+                expected_eff = [h for h in expected
+                                if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= limite]
+                if not expected_eff: continue
         else:
             if d["date"].weekday() not in weekdays: continue
             if not d["is_workday"]: continue
@@ -203,7 +213,7 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
             ultimo_m = max(int(x.split(":")[1]) for x in expected if x.startswith(f"{ultimo_h:02d}:"))
             deadline = datetime.combine(d["date"], time(ultimo_h, ultimo_m)) + timedelta(hours=DELAY_HOURS_AFTER_LAST)
             if agora < deadline: continue
-        faltando = faltas_no_dia(d["punches"], expected)
+        faltando = faltas_no_dia(d["punches"], expected_eff)
         if faltando:
             pendencias.append({
                 "date":      d["date"],
