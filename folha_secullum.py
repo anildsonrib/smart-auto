@@ -11,8 +11,10 @@ Uso:
   python folha_secullum.py                       # mes corrente
   python folha_secullum.py 2026-05-01 2026-05-31 # periodo customizado
 """
+import json
 import re
 import sys
+import time
 import requests
 from datetime import datetime, date
 from calendar import monthrange
@@ -37,6 +39,8 @@ ENV_VARS = load_env()
 BASE_URL = ENV_VARS["SECULLUM_BASE_URL"].rstrip("/") + "/"
 USERNAME = ENV_VARS["SECULLUM_USERNAME"]
 PASSWORD = ENV_VARS["SECULLUM_PASSWORD"]
+CACHE_DIR     = ROOT / "cache"
+CACHE_SECONDS = 600  # 10 min: mesmo padrao do Senior/MentorH
 
 LOGIN_URL    = BASE_URL + "Paginas/pgLogin.aspx"
 CALCULOS_URL = BASE_URL + "Paginas/pgCalculos.aspx"
@@ -156,13 +160,38 @@ def parse_periodo(args):
         sys.exit("uso: folha_secullum.py [yyyy-mm | yyyy-mm-dd yyyy-mm-dd]")
     return ini, fim
 
+def _cache_path(ini: date, fim: date) -> Path:
+    return CACHE_DIR / f"secullum_{ini.isoformat()}_{fim.isoformat()}.json"
+
+def _load_cache(ini: date, fim: date):
+    p = _cache_path(ini, fim)
+    if not p.exists(): return None
+    age = time.time() - p.stat().st_mtime
+    if age >= CACHE_SECONDS: return None
+    data = json.loads(p.read_text(encoding="utf-8"))
+    for d in data:
+        d["date"] = date.fromisoformat(d["date"])
+    print(f"[cache] reusando {p.name} (idade {int(age)}s)")
+    return data
+
+def _save_cache(ini: date, fim: date, dias: list[dict]):
+    CACHE_DIR.mkdir(exist_ok=True)
+    serial = [{**d, "date": d["date"].isoformat()} for d in dias]
+    _cache_path(ini, fim).write_text(json.dumps(serial, ensure_ascii=False), encoding="utf-8")
+
 def baixar(ini: date | None = None, fim: date | None = None):
     """API publica: retorna list[dict] dos dias parseados."""
     if ini is None or fim is None:
         ini, fim = parse_periodo([])
+    cached = _load_cache(ini, fim)
+    if cached is not None:
+        return cached
+    print(f"[download] baixando folha Secullum {ini} a {fim}")
     s = login()
     html = baixar_periodo(s, ini, fim)
-    return parse_html(html, ini.year)
+    dias = parse_html(html, ini.year)
+    _save_cache(ini, fim, dias)
+    return dias
 
 def main():
     ini, fim = parse_periodo(sys.argv[1:])
