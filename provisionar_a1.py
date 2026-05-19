@@ -26,7 +26,8 @@ COMPARTMENT    = "ocid1.tenancy.oc1..REDACTED"
 SUBNET         = "ocid1.subnet.oc1..REDACTED"
 DISPLAY_NAME   = "smart-auto-a1"
 SSH_PUB_FILE   = Path.home() / ".ssh" / "oracle_a1.pub"
-INTERVAL_S     = 300  # 5 min
+INTERVAL_S     = 60   # 1 min (OCI rate-limit ~10/min em LaunchInstance, 1/min e seguro)
+FAULT_DOMAINS  = ["FAULT-DOMAIN-1", "FAULT-DOMAIN-2", "FAULT-DOMAIN-3"]
 
 ENV = Path("/home/ubuntu/smart_auto/.env")
 def env(k):
@@ -168,10 +169,12 @@ def main():
             msg = f"⚠️ Ja existe A1 ativa: `{inst.display_name}` ({inst.lifecycle_state}). Parando caca."
             log(msg); tg(msg); return
 
-        log(f"tentativa #{tentativas}: launching...")
+        fd = FAULT_DOMAINS[(tentativas - 1) % len(FAULT_DOMAINS)]
+        log(f"tentativa #{tentativas} ({fd}): launching...")
         try:
             details = oci.core.models.LaunchInstanceDetails(
                 availability_domain=AD,
+                fault_domain=fd,
                 compartment_id=COMPARTMENT,
                 shape=SHAPE,
                 shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
@@ -205,10 +208,15 @@ def main():
 
         except oci.exceptions.ServiceError as e:
             if e.status == 500 and "Out of host capacity" in (e.message or ""):
-                log(f"  out of capacity. aguardando {INTERVAL_S}s...")
-                # Sem notificacao - silencioso
+                log(f"  out of capacity ({fd}). aguardando {INTERVAL_S}s...")
+                # Heartbeat: 1 ping a cada 500 tentativas pra confirmar vida sem encher chat
+                if tentativas % 500 == 0:
+                    tg(f"💓 caca-a1 vivo: {tentativas} tentativas, ainda sem capacidade.")
             elif e.status == 500 and "InternalError" in (e.code or ""):
                 log(f"  internal error ({e.message}). aguardando {INTERVAL_S}s...")
+            elif e.status == 429 or "TooManyRequests" in (e.code or ""):
+                log(f"  rate-limit OCI ({e.code}). backoff 60s extra...")
+                time.sleep(60)
             else:
                 msg = (f"❌ *Caca A1 abortada* (erro inesperado)\n"
                        f"status={e.status} code={e.code}\n"
