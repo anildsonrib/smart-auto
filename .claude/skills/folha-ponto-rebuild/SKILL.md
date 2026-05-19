@@ -49,7 +49,8 @@ def _alinhar(obs, exp):
 
 - `if d["date"] > hoje: continue`
 - `if d["date"].weekday() not in weekdays: continue`
-- `if _has_absence(raw): continue` (FERIAS/ABO/FOLGA/FERIADO)
+- `if _has_absence(raw): continue` (FERIAS/ABO/ABONO/FALTA/FOLGA/FERIADO/DSR/ATESTADO)
+- Para o Senior: o texto da ocorrencia esta na propria linha do PDF apos o codigo horario (ex: `14/04 TER 0260 Atestado nao Rel.ao Trabalho`). Extrair removendo horarios `HH:MM` do `resto`, passar pro `_has_absence` e tambem propagar como `motivo` no dict do dia (a mensagem final mostra esse texto quando o dia segue pendente com 0 marcacoes).
 - `if hoje == d["date"] and now < ultima_esperada + 24h: continue`
 
 ## Armadilhas conhecidas

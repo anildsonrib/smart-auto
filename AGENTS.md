@@ -67,7 +67,13 @@ HTTP puro contra Intersystems Cache CSP:
 
 Parse via regex de `<tr>`/`<td>`. Detecta turno por dia (diurno sex/dom vs noturno extra) e injeta `expected` por dia no dispatcher.
 
-### 4.4 Cache uniforme
+### 4.4 Deteccao de motivo na folha
+
+Quando um dia tem 0 marcacoes, o dispatcher inspeciona o texto bruto da linha (ocorrencia/obs) e:
+- Marca `is_workday=False` se casar com `_ABSENCE_TOKENS` (FERIAS, ABO, ABONO, FALTA, FOLGA, FERIADO, DSR, ATESTADO) - vale pros 3 downloaders.
+- Propaga o texto via campo `motivo`. A mensagem final do bot mostra `_Motivo na folha:_` quando o dia ficou pendente mesmo com 0 marcacoes e ha texto bruto - util pra casos onde o motivo nao casa com token (ex: "Coleta nao realizada", "Compensacao XYZ").
+
+### 4.5 Cache uniforme
 
 Todos os downloaders mantem cache JSON em `cache/<sistema>_<ini>_<fim>.json` com TTL 600s. Hit emite `[cache]`; miss emite `[login]` + `[download]`. Senior tambem mantem cache do PDF cru em `folha_ponto_*.pdf` para debug.
 

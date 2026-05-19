@@ -90,7 +90,9 @@ Cada downloader mantem cache JSON proprio em `cache/<sistema>_<ini>_<fim>.json` 
 
 Esses sao os pontos que `telegram_bot.py:MARCOS` mapeia para texto humano.
 
-Detector de ausencia em `_has_absence(raw_cells)`: case-insensitive em FERIAS|ABO|FOLGA|FERIADO.
+Detector de ausencia em `_has_absence(raw_cells)`: case-insensitive em FERIAS|ABO|ABONO|FALTA|FOLGA|FERIADO|DSR|ATESTADO.
+
+Os 3 dispatchers passam o texto bruto da linha (ocorrencia/obs do Secullum/MentorH, "resto" sem horarios do PDF Senior) para `_has_absence` e tambem populam o campo `motivo` no dict do dia. `avaliar_dias` propaga `motivo` para `pendencias` e `bloco()` adiciona `_Motivo na folha:_` na mensagem quando o dia ficou pendente com 0 marcacoes e ha texto.
 
 ## State
 

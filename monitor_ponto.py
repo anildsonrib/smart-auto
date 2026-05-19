@@ -120,12 +120,16 @@ def parse_pdf(pdf_path: Path, ini: date, fim: date):
                 if horas[:n] == horas[n:2*n]:
                     punches = horas[:n]
                     break
+        # Texto da ocorrencia = "resto" sem as marcacoes (horarios HH:MM)
+        motivo = RE_HORA.sub("", resto).strip()
+        absent = _has_absence([motivo]) if motivo else False
         dias.append({
             "date":        d,
             "weekday":     weekday,
             "hor_code":    hor,
             "punches":     punches,
-            "is_workday":  hor == "0260",
+            "is_workday":  hor == "0260" and not absent,
+            "motivo":      motivo,
         })
     return dias
 
@@ -229,6 +233,7 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
                 "weekday":   d["weekday"],
                 "punches":   d["punches"],
                 "faltando":  faltando,
+                "motivo":    d.get("motivo", ""),
             })
     return pendencias
 
@@ -334,6 +339,7 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
                 "punches":    d.get("marcacoes", []),
                 "is_workday": d["date"].weekday() in cfg["weekdays"] and not absent,
+                "motivo":     " ".join(c for c in d.get("raw", []) if c and not re.match(r"^\d{2}:\d{2}", c.strip())).strip(),
             })
         return dias
     elif cfg["downloader"] == "mentorh":
@@ -359,12 +365,16 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
                 expected_dia = ["07:00"]                          # saida de plantao da noite anterior
             else:
                 expected_dia = ["07:00", "19:00"]                 # diurno padrao (sex/dom)
+            ocorrencia_txt = (cells[5] if len(cells) > 5 else "").strip()
+            obs_txt        = (cells[6] if len(cells) > 6 else "").strip()
+            motivo = " ".join(s for s in (ocorrencia_txt, obs_txt) if s).strip()
             dias.append({
                 "date":       d["date"],
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
                 "punches":    punches,
                 "is_workday": bool(ch_code) and not absent and not sem_dados,
                 "expected":   expected_dia,
+                "motivo":     motivo,
             })
         return dias
     else:
@@ -449,12 +459,15 @@ def main():
         wk  = SEMANA_LONGA.get(p["weekday"], p["weekday"])
         faltando_lst = "\n".join(f"   {h}" for h in p["faltando"])
         marcadas_lst = "\n".join(f"   {h}" for h in p["punches"]) if p["punches"] else "   (nenhuma)"
+        motivo = (p.get("motivo") or "").strip()
+        rodape = f"\n\n_Motivo na folha:_\n   {motivo}" if (not p["punches"] and motivo) else ""
         return (
             f"*{wk}, {dia}*\n"
             f"\n"
             f"_Faltaram:_\n{faltando_lst}\n"
             f"\n"
             f"_Marcadas:_\n{marcadas_lst}"
+            f"{rodape}"
         )
 
     cabecalho = f"*{IDENT}*\n\n*Ponto pendente*\n\n"

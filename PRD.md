@@ -36,6 +36,7 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
   - ultimas N horas (`DELAY_HOURS_AFTER_LAST = 24`) na rotina normal
 - Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de `FORCE_TODAY_GRACE_HOURS = 4`: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda tem tempo de bater.
 - Sistemas com escala variavel (ex: MentorH plantao 12x36) podem fornecer `expected` por dia via dispatcher (`baixar_dias`); o orquestrador respeita esse override antes do default do sistema. Permite detectar plantao noturno (entrada 19h dia X, saida 07h dia X+1) sem falso positivo.
+- Quando um dia tem 0 marcacoes mas a folha indica motivo (ATESTADO, ABONO, FERIAS, FOLGA, FERIADO, DSR, FALTA), o dia e marcado como ausencia justificada (`is_workday=False`) e nao gera pendencia. Vale para os 3 sistemas (Senior tambem captura o texto da ocorrencia na propria linha do PDF). Quando o motivo nao casa com token conhecido, o dia segue como pendencia mas a mensagem inclui `_Motivo na folha:_` com o texto bruto, para o usuario decidir.
 
 ### 4.3 Notificacao
 

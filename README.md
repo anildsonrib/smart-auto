@@ -16,6 +16,8 @@ Marcacoes podem ocorrer antes ou depois dos horarios padrao - o sistema alinha s
 
 Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de 4h: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda nao bateu o ponto.
 
+Dias com 0 marcacoes e motivo na folha (atestado, abono, ferias, folga, feriado, DSR, falta) sao tratados como ausencia justificada e nao geram pendencia. Quando o motivo nao casa com token conhecido, o dia segue pendente e a mensagem inclui o texto bruto da ocorrencia para decisao manual.
+
 ## Arquitetura
 
 ```
