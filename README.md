@@ -58,6 +58,7 @@ Saidas:
 | `folha_secullum.py`     | Login + scrape Secullum Ponto 4 (HTTP puro, sem browser) |
 | `folha_mentorh.py`      | Login + scrape SIGP EBSERH/MentorH (HTTP puro via %CSP.Broker.cls) |
 | `telegram_bot.py`       | Long-poll do Telegram, parse de comandos, streaming de saida |
+| `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 7/20 do mes (com shift quinta+segunda em fim de semana) |
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
 | `caca-a1.service`       | systemd unit do hunter A1 |
@@ -107,6 +108,9 @@ python telegram_bot.py
 0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st
 0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss
 0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb
+0 18 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 7/20 (shift quinta+segunda se cair fds), range mes corrente
+0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
+0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
 
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar

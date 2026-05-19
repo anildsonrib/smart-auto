@@ -391,6 +391,7 @@ def main():
     ap.add_argument("--force-range", nargs=2, metavar=("INI","FIM"), help="forca avaliar um intervalo YYYY-MM-DD YYYY-MM-DD")
     ap.add_argument("--pdf", type=str, help="(so st) usar PDF local em vez de baixar")
     ap.add_argument("--no-whatsapp", action="store_true", help="nao envia WhatsApp (so processa e atualiza state)")
+    ap.add_argument("--subtitulo", type=str, default="", help="linha extra no cabecalho da mensagem, logo abaixo do identificador do sistema")
     args = ap.parse_args()
     sys_cfg = SYSTEMS[args.system]
     IDENT = sys_cfg["id"]
@@ -470,7 +471,8 @@ def main():
             f"{rodape}"
         )
 
-    cabecalho = f"*{IDENT}*\n\n*Ponto pendente*\n\n"
+    subt = (args.subtitulo or "").strip()
+    cabecalho = f"*{IDENT}*\n" + (f"\n{subt}\n" if subt else "") + f"\n*Ponto pendente*\n\n"
     if len(novos) == 1:
         msg = cabecalho + bloco(novos[0])
     else:

@@ -4,7 +4,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
-- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb).
+- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb), `diario 18h` (justificativa via wrapper).
 - **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao dupla (Telegram + WhatsApp) somente se houver pendencias novas.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
@@ -33,6 +33,17 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
   5. `systemctl disable caca-a1` (self-shutdown)
 - **Notificacao**: Telegram apenas em sucesso ou erro inesperado. Tentativas "out of capacity" sao silenciosas.
 - **Custo**: zero - shape sempre dentro do Always Free; `Restart=no` impede loop infinito apos sucesso.
+
+## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
+
+- **Gatilhos**: 3 crons distintos na VM.
+  - `0 18 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 7 e 20; weekend shift = quinta+segunda. Range: mes corrente.
+  - `0 16 * * * --system ss`: justificativa Sesa (online). Dia 1 sem shift. Range: mes anterior.
+  - `0 16 * * * --system eb`: justificativa MentorH (online). Dia 1 sem shift. Range: mes anterior.
+- **Regras**: definidas no dict `RULES` (days, weekend_shift, periodo, subtitulo) dentro de `justificativa.py`.
+- **Acao**: chama `monitor_ponto.py --system <sys> --force-range INI FIM --subtitulo "..."`. `--force-range` bypassa dedup mas preserva carencia de 4h e deteccao de motivo na folha. Sem pendencia => nenhuma mensagem enviada.
+- **Saida**: WhatsApp via CallMeBot (monitor_ponto nao envia Telegram em modo cron).
+- **Log**: `/home/ubuntu/smart_auto/justificativa.log`.
 
 ## 4. Downloaders
 
