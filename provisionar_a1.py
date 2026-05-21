@@ -29,15 +29,33 @@ SSH_PUB_FILE   = Path.home() / ".ssh" / "oracle_a1.pub"
 INTERVAL_S     = 60   # 1 min (OCI rate-limit ~10/min em LaunchInstance, 1/min e seguro)
 FAULT_DOMAINS  = ["FAULT-DOMAIN-1", "FAULT-DOMAIN-2", "FAULT-DOMAIN-3"]
 
-ENV = Path("/home/ubuntu/smart_auto/.env")
+ENV = Path(os.environ.get("SMART_AUTO_ENV", "/home/ubuntu/smart_auto/.env"))
 def env(k):
-    for line in ENV.read_text().splitlines():
-        if line.startswith(k+"="): return line.split("=",1)[1].strip()
+    if ENV.exists():
+        for line in ENV.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key.strip() == k:
+                return value.strip().strip("\"'")
+    return os.environ.get(k, "")
+
+def env_any(*keys):
+    for key in keys:
+        value = env(key)
+        if value:
+            return value
     return ""
-TG_TOKEN = env("TELEGRAM_BOT_TOKEN")
-TG_CHAT  = int(env("TELEGRAM_CHAT_ID"))
+
+TG_TOKEN = env_any("CACA_A1_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
+TG_CHAT_RAW = env_any("CACA_A1_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID")
+TG_CHAT  = int(TG_CHAT_RAW) if TG_CHAT_RAW else 0
 
 def tg(msg: str):
+    if not TG_TOKEN or not TG_CHAT:
+        print("[tg-skip] CACA_A1_TELEGRAM_BOT_TOKEN/CHAT_ID nao configurados.", flush=True)
+        return
     try:
         requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
                       json={"chat_id": TG_CHAT, "text": msg, "parse_mode": "Markdown"},

@@ -4,7 +4,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
-- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb), `diario 18h` (justificativa via wrapper).
+- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb), `diario 09h` (justificativa st) + `diario 16h` (justificativa ss/eb) via wrapper.
 - **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao dupla (Telegram + WhatsApp) somente se houver pendencias novas.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
@@ -31,13 +31,13 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
   3. instala `smart-auto-bot.service` + crontab
   4. para o bot na VM E2 (evita duplo polling)
   5. `systemctl disable caca-a1` (self-shutdown)
-- **Notificacao**: Telegram apenas em sucesso ou erro inesperado. Tentativas "out of capacity" sao silenciosas.
+- **Notificacao**: Telegram apenas em sucesso ou erro inesperado. Usa `CACA_A1_TELEGRAM_BOT_TOKEN`/`CACA_A1_TELEGRAM_CHAT_ID` quando configurados; caso contrario, usa o bot principal. Tentativas "out of capacity" sao silenciosas.
 - **Custo**: zero - shape sempre dentro do Always Free; `Restart=no` impede loop infinito apos sucesso.
 
 ## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
 
 - **Gatilhos**: 3 crons distintos na VM.
-  - `0 18 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 7 e 20; weekend shift = quinta+segunda. Range: mes corrente.
+  - `0 9 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 8 e 21; weekend shift = quinta+segunda. Range: mes corrente.
   - `0 16 * * * --system ss`: justificativa Sesa (online). Dia 1 sem shift. Range: mes anterior.
   - `0 16 * * * --system eb`: justificativa MentorH (online). Dia 1 sem shift. Range: mes anterior.
 - **Regras**: definidas no dict `RULES` (days, weekend_shift, periodo, subtitulo) dentro de `justificativa.py`.

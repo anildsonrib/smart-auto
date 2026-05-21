@@ -39,6 +39,8 @@ def _alinhar(obs, exp):
 
 `faltas_no_dia(punches, expected)` chama `_alinhar` e devolve list de horarios esperados que ficaram sem par.
 
+`extras_no_dia(punches, expected)` espelha o alinhamento (papeis trocados) quando `len(punches) > len(expected)` e devolve as marcacoes que sobraram. Limiar deriva de `len(expected)` do sistema: st=4 (5+ extras), ss=2 (3+ extras), eb=2 (3+ extras). Em `--force` no dia corrente com `expected_eff` reduzido por grace, extras nao sao detectados (evita falso-positivo).
+
 ## Filtros
 
 `force_day` e `force_range` compartilham o mesmo bloco:
@@ -66,6 +68,7 @@ def avaliar_dias(dias, sys_cfg, agora, force_day=None, force_range=None):
             # rotina normal: respeita ja_notificados + DELAY_HOURS_AFTER_LAST
             ...
         faltando = faltas_no_dia(d["punches"], expected_eff)
+        extras = [] if len(expected_eff) < len(expected_full) else extras_no_dia(d["punches"], expected_full)
 ```
 
 Motivo da carencia: rodar `/forcar` durante o expediente nao deve cobrar marcacoes que o usuario ainda nao teve a chance de bater.

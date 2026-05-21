@@ -28,7 +28,7 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
 ### 4.2 Avaliacao de pendencias
 
 - DP de alinhamento sequencial entre marcacoes observadas e esperadas
-- Considera pendencia somente se `len(observadas) < len(esperadas)`
+- Gera pendencia em dois casos: `len(observadas) < len(esperadas)` (faltas) ou `len(observadas) > len(esperadas)` (extras). Limiar deriva de `expected` por sistema (st=4, ss=2, eb=2). Em `--force` no dia corrente com `expected` filtrado pela carencia, extras nao sao detectados.
 - Pula:
   - dias futuros
   - dias nao-uteis do sistema
@@ -60,7 +60,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - `sex 15h`: roda `--system st`
 - `sex 21h`: roda `--system ss`
 - `seg 06h`: roda `--system eb` (cobre plantao de domingo + extras da semana)
-- `diario 18h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 7 e 20 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: mes corrente.
+- `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: mes corrente.
 - `diario 16h --system ss` e `--system eb`: justificativa Sesa e MentorH (online, qualquer dia/hora vale). Dispara somente em dia 1 do mes, sem shift. Range: mes anterior fechado.
 - Em todos os casos: `justificativa.py` chama `monitor_ponto.py --force-range`, respeita carencia de 4h, motivo na folha (atestado/abono/etc) e so envia se houver pendencia real.
 - Notificacao dupla: Telegram + WhatsApp
@@ -69,6 +69,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 
 - Polling a cada 5 min na Oracle por capacidade ARM `VM.Standard.A1.Flex` (4 OCPU + 24 GB)
 - Notifica Telegram somente em sucesso ou erro inesperado (nao a cada tentativa)
+- Pode usar bot Telegram proprio via `CACA_A1_TELEGRAM_BOT_TOKEN` e `CACA_A1_TELEGRAM_CHAT_ID`; se ausentes, usa o bot principal.
 - Auto-migra arquivos + systemd + cron pra nova VM
 - Auto-desabilita servico apos sucesso (`systemctl disable caca-a1`)
 

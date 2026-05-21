@@ -86,7 +86,7 @@ RE_LINHA_DIA = re.compile(
 )
 RE_HORA = re.compile(r"\b(\d{2}:\d{2})\b")
 
-def parse_pdf(pdf_path: Path, ini: date, fim: date):
+def parse_pdf(pdf_path: Path, ini: date, fim: date, expected_count: int | None = None):
     """Retorna lista de {date, weekday, hor_code, punches[], is_workday}.
 
     Atribui ano a cada linha DD/MM com base no periodo [ini, fim]:
@@ -113,13 +113,19 @@ def parse_pdf(pdf_path: Path, ini: date, fim: date):
             continue
         horas = RE_HORA.findall(resto)
         # Linha tem: Originais + Tratadas + Trabalho [+ HE60 + HE100 + AdNot + Debito/Credito]
-        # Heuristica: o maior N tal que horas[:N] == horas[N:2N] sao as Originais (== Tratadas)
+        # 1) Caso normal: Originais == Tratadas -> heuristica simetrica.
+        # 2) Caso ajustado por RH: Originais tem menos itens que Tratadas (usuario nao bateu
+        #    todos os pontos, RH preencheu via tratativa). Tratadas reflete o que vale.
+        #    Pegamos os ultimos `expected_count` valores antes do total Trabalho (penultima
+        #    janela). Vale tambem para o caso normal.
         punches = []
         if hor == "0260" and horas:
             for n in range(len(horas) // 2, 0, -1):
                 if horas[:n] == horas[n:2*n]:
                     punches = horas[:n]
                     break
+            if not punches and expected_count and len(horas) > expected_count:
+                punches = horas[-(expected_count + 1):-1]
         # Texto da ocorrencia = "resto" sem as marcacoes (horarios HH:MM)
         motivo = RE_HORA.sub("", resto).strip()
         absent = _has_absence([motivo]) if motivo else False
@@ -183,7 +189,7 @@ def faltas_no_dia(punches, expected):
 
     Logica:
     - 0 marcacoes -> tudo falta
-    - >= len(expected) marcacoes -> assume todas cobertas (extras sao ignoradas)
+    - >= len(expected) marcacoes -> assume todas cobertas
     - menos marcacoes -> alinha sequencialmente minimizando diferenca total
     """
     if not punches:
@@ -193,10 +199,22 @@ def faltas_no_dia(punches, expected):
     cobertos = _alinhar(punches, expected)
     return [expected[i] for i in range(len(expected)) if i not in cobertos]
 
+def extras_no_dia(punches, expected):
+    """Retorna marcacoes que excedem a quantidade esperada no dia.
+
+    Logica:
+    - <= len(expected) marcacoes -> nenhuma extra
+    - mais marcacoes -> alinha cada esperada com a melhor punch; sobras sao extras.
+    """
+    if len(punches) <= len(expected) or not expected:
+        return []
+    cobertos = _alinhar(expected, punches)
+    return [punches[i] for i in range(len(punches)) if i not in cobertos]
+
 def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
                  force_day: date | None = None,
                  force_range: tuple[date, date] | None = None):
-    """Retorna [{date, weekday, faltando[], punches[]}] dos dias com pendencia que podem ser notificados."""
+    """Retorna [{date, weekday, faltando[], extras[], punches[]}] dos dias com pendencia que podem ser notificados."""
     pendencias = []
     expected = sys_cfg["expected"]
     weekdays = sys_cfg["weekdays"]
@@ -204,6 +222,7 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
     for d in dias:
         # Override per-day (ex: MentorH escala variavel - dia/noite/folga)
         expected_eff = d.get("expected") or expected
+        expected_full = expected_eff
         if force_range or force_day:
             if force_range:
                 ini, fim = force_range
@@ -227,12 +246,17 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
             deadline = datetime.combine(d["date"], time(ultimo_h, ultimo_m)) + timedelta(hours=DELAY_HOURS_AFTER_LAST)
             if agora < deadline: continue
         faltando = faltas_no_dia(d["punches"], expected_eff)
-        if faltando:
+        # Extras so contam quando o dia foi avaliado contra a escala completa
+        # (em --force no dia corrente, expected_eff pode estar filtrado por grace).
+        partial = len(expected_eff) < len(expected_full)
+        extras = [] if partial else extras_no_dia(d["punches"], expected_full)
+        if faltando or extras:
             pendencias.append({
                 "date":      d["date"],
                 "weekday":   d["weekday"],
                 "punches":   d["punches"],
                 "faltando":  faltando,
+                "extras":    extras,
                 "motivo":    d.get("motivo", ""),
             })
     return pendencias
@@ -327,7 +351,7 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
     if cfg["downloader"] == "senior":
         pdf_path = baixar_pdf_periodo(ini, fim)
         print(f"[pdf] {pdf_path}")
-        return parse_pdf(pdf_path, ini, fim)
+        return parse_pdf(pdf_path, ini, fim, expected_count=len(cfg["expected"]))
     elif cfg["downloader"] == "secullum":
         import folha_secullum
         raw = folha_secullum.baixar(ini, fim)
@@ -458,18 +482,18 @@ def main():
     def bloco(p):
         dia = p["date"].strftime("%d/%m")
         wk  = SEMANA_LONGA.get(p["weekday"], p["weekday"])
-        faltando_lst = "\n".join(f"   {h}" for h in p["faltando"])
         marcadas_lst = "\n".join(f"   {h}" for h in p["punches"]) if p["punches"] else "   (nenhuma)"
         motivo = (p.get("motivo") or "").strip()
         rodape = f"\n\n_Motivo na folha:_\n   {motivo}" if (not p["punches"] and motivo) else ""
-        return (
-            f"*{wk}, {dia}*\n"
-            f"\n"
-            f"_Faltaram:_\n{faltando_lst}\n"
-            f"\n"
-            f"_Marcadas:_\n{marcadas_lst}"
-            f"{rodape}"
-        )
+        secoes = [f"*{wk}, {dia}*"]
+        if p.get("faltando"):
+            faltando_lst = "\n".join(f"   {h}" for h in p["faltando"])
+            secoes.append(f"_Faltaram:_\n{faltando_lst}")
+        if p.get("extras"):
+            extras_lst = "\n".join(f"   {h}" for h in p["extras"])
+            secoes.append(f"_Marcacoes extras:_\n{extras_lst}")
+        secoes.append(f"_Marcadas:_\n{marcadas_lst}")
+        return "\n\n".join(secoes) + rodape
 
     subt = (args.subtitulo or "").strip()
     cabecalho = f"*{IDENT}*\n" + (f"\n{subt}\n" if subt else "") + f"\n*Ponto pendente*\n\n"

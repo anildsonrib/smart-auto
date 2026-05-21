@@ -12,7 +12,7 @@ Monitor automatizado de folha de ponto. Le sistemas de RH externos, detecta marc
 | `ss`   | Sesa          | Secullum Ponto 4 (ASP.NET)      | 2 (14/20)                  | seg-qui                |
 | `eb`   | MentorH       | SIGP EBSERH (Intersystems CSP)  | 2 (07/19 diurno; 19/07 not)| sex+dom + plantao noite|
 
-Marcacoes podem ocorrer antes ou depois dos horarios padrao - o sistema alinha sequencialmente via DP (programacao dinamica) e considera pendencia somente quando o numero de marcacoes do dia for menor que o esperado.
+Marcacoes podem ocorrer antes ou depois dos horarios padrao - o sistema alinha sequencialmente via DP (programacao dinamica) e gera pendencia em dois casos: (a) menos marcacoes que o esperado (faltas) ou (b) mais marcacoes que o esperado (extras). O limiar de extras deriva do `expected` de cada sistema: Senior 4 (5+ = extra), Secullum 2 (3+ = extra), MentorH 2 (3+ = extra). Em `--force` no dia corrente com `expected` filtrado pela carencia, extras nao sao detectados.
 
 Em `/forcar` (dia ou range) que inclua hoje, aplica carencia de 4h: so cobra marcacoes esperadas ate `agora - 4h`. Evita falso positivo enquanto o usuario ainda nao bateu o ponto.
 
@@ -58,7 +58,7 @@ Saidas:
 | `folha_secullum.py`     | Login + scrape Secullum Ponto 4 (HTTP puro, sem browser) |
 | `folha_mentorh.py`      | Login + scrape SIGP EBSERH/MentorH (HTTP puro via %CSP.Broker.cls) |
 | `telegram_bot.py`       | Long-poll do Telegram, parse de comandos, streaming de saida |
-| `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 7/20 do mes (com shift quinta+segunda em fim de semana) |
+| `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 8/21 do mes (com shift quinta+segunda em fim de semana) |
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
 | `caca-a1.service`       | systemd unit do hunter A1 |
@@ -89,6 +89,8 @@ MENTORH_USERNAME=...
 MENTORH_PASSWORD=...   # entre aspas se contiver `#`
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
+CACA_A1_TELEGRAM_BOT_TOKEN=...  # opcional; se vazio, usa TELEGRAM_BOT_TOKEN
+CACA_A1_TELEGRAM_CHAT_ID=...    # opcional; se vazio, usa TELEGRAM_CHAT_ID
 CALLMEBOT_PHONE=55XXYYYYYYYYY
 CALLMEBOT_APIKEY=...
 ```
@@ -108,13 +110,16 @@ python telegram_bot.py
 0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st
 0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss
 0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb
-0 18 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 7/20 (shift quinta+segunda se cair fds), range mes corrente
+0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range mes corrente
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
 
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
 ```
+
+Para separar as mensagens da caca A1 do bot de ponto, crie outro bot no @BotFather
+e preencha `CACA_A1_TELEGRAM_BOT_TOKEN` e `CACA_A1_TELEGRAM_CHAT_ID` no `.env` da VM.
 
 ## Comandos do bot
 

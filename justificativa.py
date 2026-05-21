@@ -2,7 +2,7 @@
 Notificacao de justificativa por sistema, com regras especificas.
 
 Regras (RULES dict):
-- st  (Santi/Senior RH): dias 7 e 20 do mes, as 18h. Se cair em sex/sab/dom,
+- st  (Santi/Senior RH): dias 8 e 21 do mes, as 09h. Se cair em sex/sab/dom,
   dispara na quinta anterior E na segunda seguinte (justificativa manual,
   exige presenca fisica).
 - ss  (Sesa/Secullum) e eb (MentorH/EBSERH): dia 1 do mes, as 16h, sem shift
@@ -29,7 +29,7 @@ HOJE = date.today()
 
 RULES = {
     "st": {
-        "days": [7, 20],
+        "days": [8, 21],
         "weekend_shift": True,
         # st: justificativa manual no dia, checa o que ja se acumulou no mes corrente
         "periodo": "mes_corrente",
