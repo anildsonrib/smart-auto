@@ -15,6 +15,15 @@ Sequencia obrigatoria de 3 POSTs contra o endpoint Rubi/Conector (sessao mantida
 
 Parse: `pdfplumber.open()` -> iterar paginas -> `extract_table()`. Cada linha vira `{date, marcacoes[], raw[]}`.
 
+### Coluna Originais vs Tratadas
+
+Cada linha do PDF tem `Originais (N)`, `Tratadas (N)`, `Trabalho (1)` e opcionais. Tratadas e o que o RH considera valido (Originais ajustadas).
+
+- **Caso normal**: Originais == Tratadas. Heuristica simetrica: maior N onde `horas[:N] == horas[N:2N]` sao as marcacoes.
+- **Caso ajustado por RH**: usuario nao bateu todos os pontos e RH preencheu via tratativa -> `len(Originais) < len(Tratadas)`. Simetrica falha. Fallback: dropar o ultimo valor (Trabalho) e pegar os ultimos `expected_count` da sequencia restante (== Tratadas). Por isso `parse_pdf` precisa de `expected_count=len(cfg["expected"])`.
+
+Exemplo concreto: linha `06/05 QUA 0260 06:56 13:05 06:56 10:00 10:15 13:05 05:45` (Senior, expected=4). Originais=[06:56,13:05], Tratadas=[06:56,10:00,10:15,13:05], Trabalho=05:45. Sem o fallback, retornaria 0 marcacoes e falso-positivo "todas faltando".
+
 Cache: salvar PDF em `cache/senior_<YYYYMM>.pdf` com mtime; reusar se < 600s.
 
 ## Secullum Ponto 4 (sufixo `ss`)
@@ -37,13 +46,15 @@ Parse HTML: split por `<tr>`, depois `<td>`, depois strip de tags. Atencao: celu
 
 ## Alinhamento de marcacoes (compartilhado)
 
-Use DP - NAO janela de tolerancia fixa. Motivo: 15min de tolerancia falha em casos como `13:19` vs esperado `13:00`. O usuario tem N marcacoes fixas por dia; se observou < N, ha pendencia, independente do horario.
+Use DP - NAO janela de tolerancia fixa. Motivo: 15min de tolerancia falha em casos como `13:19` vs esperado `13:00`. O usuario tem N marcacoes fixas por dia; gera pendencia se observou < N (faltas) OU > N (extras).
 
 ```python
 def _alinhar(obs, exp):
     # DP minimizando soma de |obs[i] - exp[j]| com obs[i] casando esp[j]
     # retorna mapeamento i->j ou None se len(obs) < len(exp)
 ```
+
+Faltas: `_alinhar(punches, expected)`, esperadas nao cobertas viram falta. Extras: `_alinhar(expected, punches)` (papeis trocados), punches nao cobertas sao as extras. Em `--force` no dia corrente com `expected` reduzido pela carencia, extras nao sao computadas (evita falso-positivo).
 
 ## Filtros pre-notificacao
 

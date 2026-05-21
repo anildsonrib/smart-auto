@@ -41,6 +41,10 @@ def _alinhar(obs, exp):
 
 `extras_no_dia(punches, expected)` espelha o alinhamento (papeis trocados) quando `len(punches) > len(expected)` e devolve as marcacoes que sobraram. Limiar deriva de `len(expected)` do sistema: st=4 (5+ extras), ss=2 (3+ extras), eb=2 (3+ extras). Em `--force` no dia corrente com `expected_eff` reduzido por grace, extras nao sao detectados (evita falso-positivo).
 
+### Heuristica RH-tratadas (parser Senior)
+
+`parse_pdf` recebe `expected_count=len(cfg["expected"])`. Cada linha do PDF tem Originais + Tratadas + Trabalho. Quando o RH ajusta o ponto, `len(Originais) < len(Tratadas)` e a heuristica simetrica (Originais==Tratadas) falha. Fallback: pegar `horas[-(expected_count+1):-1]` (os ultimos expected_count antes do total Trabalho). Sem isso, dias ajustados manualmente reportam "todas faltando" — falso-positivo.
+
 ## Filtros
 
 `force_day` e `force_range` compartilham o mesmo bloco:
