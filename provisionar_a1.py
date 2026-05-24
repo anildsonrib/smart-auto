@@ -235,6 +235,12 @@ def main():
             elif e.status == 429 or "TooManyRequests" in (e.code or ""):
                 log(f"  rate-limit OCI ({e.code}). backoff 60s extra...")
                 time.sleep(60)
+            elif e.status == 400 and "LimitExceeded" in (e.code or ""):
+                # No Always Free a quota A1 (4 OCPU/24 GB) e fixa e nao ha A1 nossa
+                # rodando (pre-check acima garante isso). Logo, LimitExceeded aqui e
+                # tipicamente soluco transitorio/regional da OCI, nao cota real.
+                # Tratar como transitorio em vez de abortar.
+                log(f"  limit exceeded transitorio ({e.code}). aguardando {INTERVAL_S}s...")
             else:
                 msg = (f"❌ *Caca A1 abortada* (erro inesperado)\n"
                        f"status={e.status} code={e.code}\n"
