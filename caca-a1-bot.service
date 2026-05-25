@@ -1,0 +1,17 @@
+[Unit]
+Description=Caca A1 bot responder (comandos /saude, /log)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/smart_auto
+ExecStart=/home/ubuntu/venv/bin/python /home/ubuntu/smart_auto/caca_a1_bot.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/ubuntu/smart_auto/caca_a1_bot.log
+StandardError=append:/home/ubuntu/smart_auto/caca_a1_bot.log
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,8 @@
 *.pem
 *.key
 oci_api_key*
+.tg_session.txt
+.tg_authkey.json
 
 # estado runtime
 monitor_state.json
