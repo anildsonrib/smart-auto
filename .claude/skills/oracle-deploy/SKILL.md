@@ -12,7 +12,7 @@ description: Guia para provisionar VM Oracle Always Free e fazer deploy do smart
    ```powershell
    ssh-keygen -t ed25519 -f $HOME\.ssh\oracle_a1 -N ""
    ```
-3. Provisionar `VM.Standard.E2.1.Micro` (AMD, sempre disponivel) com `cloud-init.yaml`:
+3. Provisionar `VM.Standard.E2.1.Micro` (AMD, sempre disponivel) com `deploy/cloud-init.yaml`:
    ```yaml
    #cloud-config
    users:

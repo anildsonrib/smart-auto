@@ -62,7 +62,7 @@ Saidas:
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
 | `caca-a1.service`       | systemd unit do hunter A1 |
-| `cloud-init.yaml`       | Bootstrap inicial da VM (usuario + chave SSH) |
+| `deploy/cloud-init.yaml`| Bootstrap inicial da VM (usuario + chave SSH) |
 | `.env`                  | Credenciais e tokens (ver `.env.example` abaixo) |
 | `monitor_state.json`    | Dias ja notificados, por sistema |
 
