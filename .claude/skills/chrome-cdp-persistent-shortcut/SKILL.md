@@ -49,7 +49,7 @@ Exemplos:
 
 Atribuir a partir de **9234**, sequencial.
 
-- Porta 9233 ja esta reservada (usada por `monitor-scraping/aghu-persistente.lnk` neste repositorio).
+- Porta 9233 ja esta reservada e nao deve ser reutilizada nesta conversa.
 - Varrer o contexto da conversa atual em busca de portas ja atribuidas por chamadas anteriores desta skill (9234, 9235, ...). Atribuir a proxima livre.
 - Primeira invocacao na conversa: 9234.
 
