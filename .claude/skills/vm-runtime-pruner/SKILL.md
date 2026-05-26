@@ -92,7 +92,8 @@ ssh -i ~/.ssh/oracle_smart_auto ubuntu@203.0.113.10 \
   "cd /home/ubuntu/smart_auto && systemctl is-active smart-auto-bot caca-a1 caca-a1-bot 2>/dev/null || true"
 ```
 
-2. Criar ou usar script local de prune com dry-run por padrao, por exemplo:
+2. Usar o script local de prune `deploy/prune_vm_runtime.sh` (dry-run e o modo padrao;
+   sem argumento equivale a `--dry-run`):
 
 ```bash
 bash deploy/prune_vm_runtime.sh --dry-run
