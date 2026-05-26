@@ -30,6 +30,8 @@ ENV = ROOT / ".env"
 STATE = ROOT / "monitor_state.json"
 # Script downloader Senior, invocado por subprocess (mesmo nome/local de hoje)
 FOLHA_PONTO_SCRIPT = "folha_ponto.py"
+# Prefixo dos PDFs Senior baixados (mesma convencao de nome usada hoje)
+PDF_PREFIX = "folha_ponto_"
 
 # ----------------------------------------------------------------------
 # CONFIG por sistema. Adicionar novos aqui.
@@ -312,7 +314,7 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
     Cache: se ja existe PDF com mesmo periodo e mtime < PDF_CACHE_SECONDS, reusa.
     """
     import time as _time
-    nome = f"folha_ponto_{ini.strftime('%d-%m-%Y')}_{fim.strftime('%d-%m-%Y')}.pdf"
+    nome = f"{PDF_PREFIX}{ini.strftime('%d-%m-%Y')}_{fim.strftime('%d-%m-%Y')}.pdf"
     alvo = ROOT / nome
     if alvo.exists():
         age = _time.time() - alvo.stat().st_mtime
@@ -330,7 +332,7 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
         raise RuntimeError("folha_ponto.py falhou")
     if not alvo.exists():
         # Fallback: pega o PDF mais recente
-        pdfs = sorted(ROOT.glob("folha_ponto_*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
+        pdfs = sorted(ROOT.glob(f"{PDF_PREFIX}*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not pdfs: raise RuntimeError("PDF nao encontrado apos download")
         return pdfs[0]
     return alvo
