@@ -71,6 +71,9 @@ SSH_OPTS = ["-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHos
             "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
             "-o", "LogLevel=ERROR"]
 PROJ_DIR = Path("/home/ubuntu/smart_auto")
+# Arquivos replicados para a A1 na migracao (nomes/ordem identicos ao fluxo original)
+DEPLOY_FILES = ("folha_ponto.py", "monitor_ponto.py", "telegram_bot.py", ".env",
+                "smart-auto-bot.service")
 
 def ssh_run(ip, cmd, timeout=300):
     r = subprocess.run(["ssh"] + SSH_OPTS + [f"ubuntu@{ip}", cmd],
@@ -113,8 +116,7 @@ def migrar(ip):
         return
 
     log("copiando arquivos do projeto...")
-    for f in ("folha_ponto.py", "monitor_ponto.py", "telegram_bot.py", ".env",
-              "smart-auto-bot.service"):
+    for f in DEPLOY_FILES:
         rc, out = scp_to(ip, PROJ_DIR / f, f"/home/ubuntu/smart_auto/{f}")
         if rc != 0:
             tg(f"⚠️ Falha copiando {f}: {out[-200:]}")
