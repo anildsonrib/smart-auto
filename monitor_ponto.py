@@ -28,6 +28,8 @@ import requests
 ROOT = Path(__file__).parent
 ENV = ROOT / ".env"
 STATE = ROOT / "monitor_state.json"
+# Script downloader Senior, invocado por subprocess (mesmo nome/local de hoje)
+FOLHA_PONTO_SCRIPT = "folha_ponto.py"
 
 # ----------------------------------------------------------------------
 # CONFIG por sistema. Adicionar novos aqui.
@@ -320,7 +322,7 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
 
     print(f"[download] baixando folha {ini.isoformat()} a {fim.isoformat()}...")
     res = subprocess.run(
-        [sys.executable, str(ROOT / "folha_ponto.py"), ini.isoformat(), fim.isoformat()],
+        [sys.executable, str(ROOT / FOLHA_PONTO_SCRIPT), ini.isoformat(), fim.isoformat()],
         cwd=ROOT, capture_output=True, text=True, timeout=180,
     )
     if res.returncode != 0:
