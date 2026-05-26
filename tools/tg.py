@@ -4,24 +4,26 @@ Le mensagens e envia comandos a qualquer bot/chat de dentro do VSCode,
 sem celular. Usa a session string salva em .tg_session.txt (gerada por
 tg_session_from_web.py a partir da sessao do Telegram Web).
 
-Uso:
-  python tg.py read <alvo> [n]          le as ultimas n mensagens (default 5)
-  python tg.py send <alvo> <comando>    envia comando e mostra a resposta
-  python tg.py last <alvo>              mostra a ultima mensagem
+Uso (a partir da raiz do projeto):
+  python tools/tg.py read <alvo> [n]          le as ultimas n mensagens (default 5)
+  python tools/tg.py send <alvo> <comando>    envia comando e mostra a resposta
+  python tools/tg.py last <alvo>              mostra a ultima mensagem
 
 <alvo>: @username, id numerico, ou apelido configurado em ALIASES.
 
 Exemplos:
-  python tg.py last caca
-  python tg.py read smartauto 10
-  python tg.py send smartauto "/status"
+  python tools/tg.py last caca
+  python tools/tg.py read smartauto 10
+  python tools/tg.py send smartauto "/status"
 """
 import sys, os, asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from dotenv import load_dotenv
 
-load_dotenv()
+# raiz do projeto (este script vive em tools/); sessao e .env ficam na raiz
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(ROOT, ".env"))
 
 # saida UTF-8 (emojis) mesmo no console cp1252 do Windows
 try:
@@ -31,7 +33,7 @@ except Exception:
 
 API_ID   = int(os.environ["TELEGRAM_API_ID"])
 API_HASH = os.environ["TELEGRAM_API_HASH"]
-SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".tg_session.txt")
+SESSION_FILE = os.path.join(ROOT, ".tg_session.txt")
 
 # apelidos -> entidade real
 ALIASES = {
@@ -50,7 +52,7 @@ def resolve(alvo: str):
 
 def load_session() -> str:
     if not os.path.exists(SESSION_FILE):
-        sys.exit("Sem .tg_session.txt. Rode: python tg_session_from_web.py")
+        sys.exit("Sem .tg_session.txt. Rode: python tools/tg_session_from_web.py")
     with open(SESSION_FILE, encoding="ascii") as f:
         return f.read().strip()
 
@@ -87,7 +89,7 @@ async def main():
     await client.connect()
     if not await client.is_user_authorized():
         await client.disconnect()
-        sys.exit("Session expirada. Rode: python tg_session_from_web.py")
+        sys.exit("Session expirada. Rode: python tools/tg_session_from_web.py")
     try:
         if acao == "read":
             n = int(sys.argv[3]) if len(sys.argv) > 3 else 5
@@ -96,7 +98,7 @@ async def main():
             await do_read(client, alvo, 1)
         elif acao == "send":
             if len(sys.argv) < 4:
-                sys.exit('Falta o comando. Ex: python tg.py send smartauto "/status"')
+                sys.exit('Falta o comando. Ex: python tools/tg.py send smartauto "/status"')
             await do_send(client, alvo, sys.argv[3])
         else:
             sys.exit(f"Acao invalida: {acao}")

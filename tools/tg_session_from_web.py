@@ -7,7 +7,9 @@ from telethon.crypto import AuthKey
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# raiz do projeto (este script vive em tools/); .env e segredos ficam na raiz
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(ROOT, ".env"))
 API_ID   = int(os.environ["TELEGRAM_API_ID"])
 API_HASH = os.environ["TELEGRAM_API_HASH"]
 
@@ -20,7 +22,7 @@ DC_IPS = {
     5: "91.108.56.130",
 }
 
-with open(".tg_authkey.json", encoding="ascii") as f:
+with open(os.path.join(ROOT, ".tg_authkey.json"), encoding="ascii") as f:
     data = json.load(f)
 
 dc_id  = int(data["dcId"])
@@ -45,7 +47,7 @@ async def main():
 
     # Salva a session string para reuso
     sess_str = client.session.save()
-    with open(".tg_session.txt", "w", encoding="ascii") as f:
+    with open(os.path.join(ROOT, ".tg_session.txt"), "w", encoding="ascii") as f:
         f.write(sess_str)
     print("SESSION_SAVED")
 
