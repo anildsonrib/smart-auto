@@ -127,7 +127,7 @@ Todos exigem sufixo `st`, `ss` ou `eb` (excecao: `/ajuda`).
 
 | Comando                       | Descricao |
 |-------------------------------|-----------|
-| `/checar st`                  | Roda checagem normal do periodo corrente |
+| `/checar st`                  | Roda checagem do periodo corrente, respeita 24h e ignora dedup por state |
 | `/forcar 06/05 ss`            | Avalia um dia especifico |
 | `/forcar 20/04-20/05 ss`      | Avalia um range (aceita cross-month) |
 | `/status st`                  | Lista dias ja notificados |

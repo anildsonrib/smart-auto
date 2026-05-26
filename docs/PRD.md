@@ -47,7 +47,7 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
 
 ### 4.4 Chatbot Telegram
 
-Comandos: `/checar`, `/forcar <data|range>`, `/status`, `/resetar`, `/ajuda`.
+Comandos: `/checar` (respeita 24h e ignora dedup por state), `/forcar <data|range>`, `/status`, `/resetar`, `/ajuda`.
 
 Formatos de data flexiveis: `DD/MM`, `DDMM`, `DD-MM`, `DDMMAAAA`, range com dash. Aceita cross-month.
 
