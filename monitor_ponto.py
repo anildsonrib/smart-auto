@@ -13,6 +13,7 @@ Uso:
   python monitor_ponto.py           # roda normal
   python monitor_ponto.py --dry     # nao envia WhatsApp, so mostra
   python monitor_ponto.py --force-day 2026-05-06   # forca checar dia X
+  python monitor_ponto.py --no-state                # mostra pendencias sem dedup por state
 """
 import argparse
 import json
@@ -217,7 +218,8 @@ def extras_no_dia(punches, expected):
 
 def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
                  force_day: date | None = None,
-                 force_range: tuple[date, date] | None = None):
+                 force_range: tuple[date, date] | None = None,
+                 ignore_state: bool = False):
     """Retorna [{date, weekday, faltando[], extras[], punches[]}] dos dias com pendencia que podem ser notificados."""
     pendencias = []
     expected = sys_cfg["expected"]
@@ -227,6 +229,19 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
         # Override per-day (ex: MentorH escala variavel - dia/noite/folga)
         expected_eff = d.get("expected") or expected
         expected_full = expected_eff
+        punches_eff = d["punches"]
+        if ignore_state:
+            corte = agora - timedelta(hours=DELAY_HOURS_AFTER_LAST)
+            expected_eff = [
+                h for h in expected_eff
+                if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= corte
+            ]
+            punches_eff = [
+                h for h in d["punches"]
+                if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= corte
+            ]
+            if not expected_eff:
+                continue
         if force_range or force_day:
             if force_range:
                 ini, fim = force_range
@@ -242,6 +257,10 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
                 expected_eff = [h for h in expected_eff
                                 if datetime.combine(d["date"], time(*map(int, h.split(":")))) <= limite]
                 if not expected_eff: continue
+        elif ignore_state:
+            if d["date"] > hoje: continue                     # ignora datas futuras
+            if d["date"].weekday() not in weekdays: continue  # respeita dias de trabalho do sistema
+            if not d["is_workday"]: continue                  # respeita ABO/FERIAS/folga
         else:
             if d["date"].weekday() not in weekdays: continue
             if not d["is_workday"]: continue
@@ -249,16 +268,16 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
             ultimo_m = max(int(x.split(":")[1]) for x in expected if x.startswith(f"{ultimo_h:02d}:"))
             deadline = datetime.combine(d["date"], time(ultimo_h, ultimo_m)) + timedelta(hours=DELAY_HOURS_AFTER_LAST)
             if agora < deadline: continue
-        faltando = faltas_no_dia(d["punches"], expected_eff)
+        faltando = faltas_no_dia(punches_eff, expected_eff)
         # Extras so contam quando o dia foi avaliado contra a escala completa
         # (em --force no dia corrente, expected_eff pode estar filtrado por grace).
         partial = len(expected_eff) < len(expected_full)
-        extras = [] if partial else extras_no_dia(d["punches"], expected_full)
+        extras = [] if partial else extras_no_dia(punches_eff, expected_full)
         if faltando or extras:
             pendencias.append({
                 "date":      d["date"],
                 "weekday":   d["weekday"],
-                "punches":   d["punches"],
+                "punches":   punches_eff,
                 "faltando":  faltando,
                 "extras":    extras,
                 "motivo":    d.get("motivo", ""),
@@ -419,6 +438,7 @@ def main():
     ap.add_argument("--force-range", nargs=2, metavar=("INI","FIM"), help="forca avaliar um intervalo YYYY-MM-DD YYYY-MM-DD")
     ap.add_argument("--pdf", type=str, help="(so st) usar PDF local em vez de baixar")
     ap.add_argument("--no-whatsapp", action="store_true", help="nao envia WhatsApp (so processa e atualiza state)")
+    ap.add_argument("--no-state", action="store_true", help="mostra as pendencias sem dedup por state")
     ap.add_argument("--subtitulo", type=str, default="", help="linha extra no cabecalho da mensagem, logo abaixo do identificador do sistema")
     args = ap.parse_args()
     sys_cfg = SYSTEMS[args.system]
@@ -456,12 +476,12 @@ def main():
     print(f"[parse] {len(dias)} linhas de dia extraidas")
 
     # 3. Avalia + filtra com state
-    pendencias = avaliar_dias(dias, agora, sys_cfg, force_day=force_day, force_range=force_range)
-    state = load_state(args.system)
+    pendencias = avaliar_dias(dias, agora, sys_cfg, force_day=force_day, force_range=force_range, ignore_state=args.no_state)
+    state = {} if args.no_state else load_state(args.system)
     novos = []
     for p in pendencias:
         key = p["date"].isoformat()
-        if not args.force_day and not args.force_range and key in state:
+        if not args.no_state and not args.force_day and not args.force_range and key in state:
             print(f"[skip] {key} ja notificado em {state[key]}")
             continue
         novos.append(p)
@@ -470,7 +490,7 @@ def main():
     if not novos:
         print(f"[ok] nada novo a notificar ({len(pendencias)} pendencia(s) ja conhecida(s)).")
         ok_key = f"ok_{agora.strftime('%G-W%V')}"
-        if not args.force_day and not args.force_range and ok_key not in state and not args.dry:
+        if not args.no_state and not args.force_day and not args.force_range and ok_key not in state and not args.dry:
             msg = f"*{IDENT}*\n\n*Ponto OK*\n\nSemana fechada sem pendencias. Bom fim de semana!"
             print("\n--- Mensagem ---\n" + msg + "\n")
             if send_whatsapp(env, msg, skip=args.no_whatsapp):
@@ -478,7 +498,7 @@ def main():
                 save_state(args.system, state)
                 print(f"[state] {ok_key} registrado.")
         else:
-            print(f"[ok] mensagem semanal pulada (key={ok_key}, dry={args.dry}, force={bool(args.force_day)}).")
+            print(f"[ok] mensagem semanal pulada (key={ok_key}, dry={args.dry}, force={bool(args.force_day)}, no_state={args.no_state}).")
         return
 
     # 5. Monta mensagem (formato otimizado pra WhatsApp - evita auto-link de datas/horas)
@@ -513,6 +533,9 @@ def main():
         print("[dry] modo dry-run, nao enviou.")
         return
     if send_whatsapp(env, msg, skip=args.no_whatsapp):
+        if args.no_state:
+            print("[state] no-state ativo; state nao foi atualizado.")
+            return
         for p in novos:
             state[p["date"].isoformat()] = agora.isoformat(timespec="seconds")
         save_state(args.system, state)

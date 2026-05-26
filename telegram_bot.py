@@ -280,7 +280,7 @@ def handle_command(chat_id: int, text: str):
              "`ss` - Sesa (Secullum)\n"
              "`eb` - MentorH (SIGP EBSERH)\n\n"
              "*Comandos* _(sufixo `st`/`ss`/`eb` obrigatorio)_\n"
-             "`/checar st` - checagem agora (respeita 24h + state)\n"
+             "`/checar st` - checagem agora (respeita 24h, ignora dedup por state)\n"
              "`/forcar DD/MM ss` - avalia um dia (ignora 24h e state)\n"
              "`/forcar DD/MM-DD/MM ss` - avalia um range\n"
              "`/status st` - lista dias ja notificados\n"
@@ -321,7 +321,7 @@ def handle_command(chat_id: int, text: str):
         if sys_key is None:
             send(chat_id, ERR_SUFIXO); return
         send(chat_id, f"_Rodando checagem de {SYS_LABELS[sys_key]}..._")
-        out = run_monitor(["--system", sys_key, "--no-whatsapp"], chat_id=chat_id)
+        out = run_monitor(["--system", sys_key, "--no-state", "--no-whatsapp"], chat_id=chat_id)
         send(chat_id, out)
         return
 
