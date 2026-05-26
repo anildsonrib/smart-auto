@@ -92,6 +92,9 @@ smart_auto/
   caca_a1_bot.py          # bot auxiliar do hunter A1
   *.service               # units systemd na raiz quando o deploy espera isso
   monitor_state.json      # estado de deduplicacao
+  docs/                   # documentacao (ex.: docs/PRD.md)
+  tools/                  # utilitarios locais (ex.: tools/tg.py)
+  deploy/                 # bootstrap/prune (deploy/cloud-init.yaml, deploy/prune_vm_runtime.sh)
   .claude/skills/         # skills locais do workspace
   active-sessions/        # atalhos/sessoes locais
 ```
