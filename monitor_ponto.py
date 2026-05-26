@@ -329,7 +329,7 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
     )
     if res.returncode != 0:
         print(res.stdout); print(res.stderr)
-        raise RuntimeError("folha_ponto.py falhou")
+        raise RuntimeError(f"{FOLHA_PONTO_SCRIPT} falhou")
     if not alvo.exists():
         # Fallback: pega o PDF mais recente
         pdfs = sorted(ROOT.glob(f"{PDF_PREFIX}*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
