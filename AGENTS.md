@@ -5,11 +5,11 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
 - **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb), `diario 09h` (justificativa st) + `diario 16h` (justificativa ss/eb) via wrapper.
-- **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao dupla (Telegram + WhatsApp) somente se houver pendencias novas.
+- **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao WhatsApp quando houver pendencias vencidas, mesmo se ja notificadas em execucao anterior.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
 - **Saida externa**: CallMeBot HTTP + Telegram sendMessage.
-- **Falha aceitavel**: timeout/login erro -> log + nao marca como notificado, tenta na proxima.
+- **Falha aceitavel**: timeout/login erro -> log + alerta WhatsApp de falha; nao marca como notificado, tenta na proxima.
 
 ## 2. Telegram Bot (`telegram_bot.py` via `smart-auto-bot.service`)
 

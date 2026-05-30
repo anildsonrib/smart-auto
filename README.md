@@ -107,9 +107,9 @@ python telegram_bot.py
 
 ```bash
 # crontab -e
-0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st
-0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss
-0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb
+0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st --no-state
+0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss --no-state
+0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb --no-state
 0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range mes corrente
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
