@@ -9,6 +9,8 @@ oci_api_key*
 
 # estado runtime
 monitor_state.json
+retry_state.json
+.retry_state.lock
 __pycache__/
 *.pyc
 
