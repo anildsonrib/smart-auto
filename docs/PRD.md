@@ -57,13 +57,24 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 
 ### 4.5 Cron na VM
 
-- `sex 15h`: roda `--system st --no-state`
-- `sex 21h`: roda `--system ss --no-state`
-- `seg 06h`: roda `--system eb --no-state` (cobre plantao de domingo + extras da semana)
+- `sex 15h`: roda `checar_retry.py --scheduled --system st` (wrapper injeta `--no-state`)
+- `sex 21h`: roda `checar_retry.py --scheduled --system ss`
+- `seg 06h`: roda `checar_retry.py --scheduled --system eb` (cobre plantao de domingo + extras da semana)
+- `horario min 30`: `checar_retry.py --retry` reexecuta de hora em hora apenas os sistemas pendentes.
 - `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: mes corrente.
 - `diario 16h --system ss` e `--system eb`: justificativa Sesa e MentorH (online, qualquer dia/hora vale). Dispara somente em dia 1 do mes, sem shift. Range: mes anterior fechado.
 - Em todos os casos: `justificativa.py` chama `monitor_ponto.py --force-range`, respeita carencia de 4h, motivo na folha (atestado/abono/etc) e so envia se houver pendencia real.
 - Notificacao de cron via WhatsApp; falha de download/login tambem gera alerta WhatsApp quando possivel.
+
+### 4.5.1 Retry horario de falha de coleta
+
+- `checar_retry.py --scheduled --system <st|ss|eb>` envolve a checagem semanal: exit 0 limpa o retry pendente do sistema; exit != 0 registra/atualiza `retry_state.json` so para aquele sistema.
+- `checar_retry.py --retry` (cron `30 * * * *`) le `retry_state.json` e reexecuta o monitor (`--no-state --quiet-failure`) para cada sistema pendente. Sucesso limpa a entrada e envia a pendencia se houver; falha incrementa `attempts` em silencio.
+- Independente por sistema: `st`, `ss` e `eb` retentam isoladamente.
+- Primeira falha agendada mantem o alerta WhatsApp de falha; retentativas horarias sao silenciosas (`--quiet-failure`).
+- Teto `RETRY_MAX_HOURS = 24`: entradas mais antigas sao descartadas sem novo envio.
+- Sem loop interno: cada execucao faz no maximo uma tentativa por sistema; o agendamento e do cron.
+- `retry_state.json` (estado) e `retry.log` (log do retry) sao runtime na VM, fora do git. Escrita atomica + lock local simples evitam corrida.
 
 ### 4.6 Caca A1 (opcional)
 

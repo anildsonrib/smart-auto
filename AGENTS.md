@@ -4,12 +4,22 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
-- **Gatilho**: cron na VM Oracle. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb), `diario 09h` (justificativa st) + `diario 16h` (justificativa ss/eb) via wrapper.
+- **Gatilho**: cron na VM Oracle, via wrapper `checar_retry.py --scheduled`. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb). Justificativas (`diario 09h` st, `diario 16h` ss/eb) chamam `justificativa.py` direto.
 - **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao WhatsApp quando houver pendencias vencidas, mesmo se ja notificadas em execucao anterior.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
 - **Saida externa**: CallMeBot HTTP + Telegram sendMessage.
-- **Falha aceitavel**: timeout/login erro -> log + alerta WhatsApp de falha; nao marca como notificado, tenta na proxima.
+- **Falha aceitavel**: timeout/login erro -> log + alerta WhatsApp de falha; nao marca como notificado. O wrapper registra retry pendente (ver agente 1.5).
+
+## 1.5 Retry de coleta (`checar_retry.py --scheduled|--retry`)
+
+- **Gatilho**: cron na VM Oracle. `--scheduled` nas 3 checagens semanais; `--retry` a cada hora no minuto 30 (`30 * * * *`).
+- **Funcao**: tornar a checagem resiliente a indisponibilidade do sistema de ponto. `--scheduled` roda o monitor (`--no-state`) e, se falhar (exit != 0), registra o sistema em `retry_state.json`. `--retry` reexecuta de hora em hora apenas os sistemas pendentes (`--no-state --quiet-failure`).
+- **Independencia**: por sistema (`st`, `ss`, `eb`) - cada um retenta isolado.
+- **Estado**: le/escreve `retry_state.json` (since/attempts/last_error), runtime, fora do git. Escrita atomica + lock local.
+- **Saida externa**: nenhuma propria; delega ao monitor. Retentativas sao silenciosas (sem WhatsApp de falha); a 1a falha agendada ja alertou.
+- **Parada**: sucesso (exit 0) limpa a entrada; teto `RETRY_MAX_HOURS = 24` descarta entradas antigas sem novo envio. Sem loop interno - 1 tentativa por execucao.
+- **Log**: `retry.log` na VM, runtime, fora do git.
 
 ## 2. Telegram Bot (`telegram_bot.py` via `smart-auto-bot.service`)
 

@@ -59,6 +59,8 @@ Saidas:
 | `folha_mentorh.py`      | Login + scrape SIGP EBSERH/MentorH (HTTP puro via %CSP.Broker.cls) |
 | `telegram_bot.py`       | Long-poll do Telegram, parse de comandos, streaming de saida |
 | `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 8/21 do mes (com shift quinta+segunda em fim de semana) |
+| `checar_retry.py`       | Wrapper de cron: `--scheduled` roda a checagem e registra retry em caso de falha; `--retry` reexecuta de hora em hora os sistemas pendentes (`--quiet-failure`) |
+| `retry_state.json`      | Estado runtime do retry por sistema (since/attempts/last_error); fora do git |
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
 | `caca-a1.service`       | systemd unit do hunter A1 |
@@ -107,9 +109,10 @@ python telegram_bot.py
 
 ```bash
 # crontab -e
-0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st --no-state
-0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss --no-state
-0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system eb --no-state
+0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system st   # st (Senior): wrapper injeta --no-state e registra retry se falhar
+0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system ss   # ss (Secullum)
+0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system eb   # eb (MentorH), cobre plantao de domingo
+30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1   # retry horario (min 30): so reexecuta sistemas pendentes
 0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range mes corrente
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
@@ -117,6 +120,17 @@ python telegram_bot.py
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
 ```
+
+#### Retry horario (falha de coleta)
+
+As checagens semanais rodam via `checar_retry.py --scheduled --system <st|ss|eb>`. Se o sistema de ponto estiver fora do ar, lento ou inacessivel, o monitor falha (exit != 0) e o wrapper registra o sistema em `retry_state.json`. A linha `30 * * * * checar_retry.py --retry` reexecuta de hora em hora (no minuto 30) apenas os sistemas pendentes, ate conseguir.
+
+- Vale para `st`, `ss` e `eb`, de forma independente por sistema.
+- A primeira falha agendada ainda dispara o alerta WhatsApp de falha (uma vez).
+- As retentativas horarias rodam com `--quiet-failure`: silenciosas, sem WhatsApp de falha a cada hora.
+- No sucesso, a pendencia (se houver) e enviada normalmente e a entrada de retry e removida.
+- Teto de `RETRY_MAX_HOURS = 24`: entradas mais antigas sao descartadas sem novo envio.
+- `retry_state.json` e `retry.log` sao estado/log de runtime na VM, fora do git.
 
 Para separar as mensagens da caca A1 do bot de ponto, crie outro bot no @BotFather
 e preencha `CACA_A1_TELEGRAM_BOT_TOKEN` e `CACA_A1_TELEGRAM_CHAT_ID` no `.env` da VM.

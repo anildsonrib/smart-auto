@@ -33,11 +33,14 @@ description: Guia para provisionar VM Oracle Always Free e fazer deploy do smart
    sudo cp smart-auto-bot.service /etc/systemd/system/
    sudo systemctl enable --now smart-auto-bot
    ```
-6. Crontab do `ubuntu`:
+6. Crontab do `ubuntu` (checagens via wrapper `checar_retry.py`; `--scheduled` injeta `--no-state` e registra retry em falha, `--retry` reexecuta de hora em hora os sistemas pendentes):
    ```
-   0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system st
-   0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python monitor_ponto.py --system ss
+   0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system st
+   0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system ss
+   0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system eb
+   30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1
    ```
+   `retry_state.json` e `retry.log` sao runtime na VM, fora do git; nao copiar no deploy.
 
 ## Caca A1
 
