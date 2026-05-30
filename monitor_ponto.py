@@ -305,6 +305,23 @@ def send_whatsapp(env, message: str, skip: bool = False):
     print(f"[whatsapp] status={r.status_code} resp={r.text[:100]}")
     return ok
 
+def _erro_curto(exc: BaseException) -> str:
+    msg = str(exc).strip()
+    if not msg:
+        msg = exc.__class__.__name__
+    return msg[:180] + ("..." if len(msg) > 180 else "")
+
+def notificar_falha(env: dict, ident: str, exc: BaseException, skip: bool = False):
+    msg = (
+        f"*{ident}*\n\n"
+        "*Falha ao checar ponto*\n\n"
+        "Nao consegui baixar/avaliar a folha agora. "
+        "A proxima execucao tentara novamente.\n\n"
+        f"_Erro:_\n   {_erro_curto(exc)}"
+    )
+    print("\n--- Mensagem ---\n" + msg + "\n")
+    return send_whatsapp(env, msg, skip=skip)
+
 # ----------------------------------------------------------------------
 # STATE (namespaced por sistema)
 # ----------------------------------------------------------------------
@@ -439,6 +456,7 @@ def main():
     ap.add_argument("--pdf", type=str, help="(so st) usar PDF local em vez de baixar")
     ap.add_argument("--no-whatsapp", action="store_true", help="nao envia WhatsApp (so processa e atualiza state)")
     ap.add_argument("--no-state", action="store_true", help="mostra as pendencias sem dedup por state")
+    ap.add_argument("--quiet-failure", action="store_true", help="nao envia WhatsApp de falha (usado pelo retry horario)")
     ap.add_argument("--subtitulo", type=str, default="", help="linha extra no cabecalho da mensagem, logo abaixo do identificador do sistema")
     args = ap.parse_args()
     sys_cfg = SYSTEMS[args.system]
@@ -469,10 +487,16 @@ def main():
         per_fim = today.replace(day=monthrange(today.year, today.month)[1])
 
     # 2. Download + normaliza (sistema-aware)
-    if args.pdf and sys_cfg["downloader"] == "senior":
-        dias = parse_pdf(Path(args.pdf), per_ini, per_fim)
-    else:
-        dias = baixar_dias(args.system, per_ini, per_fim)
+    try:
+        if args.pdf and sys_cfg["downloader"] == "senior":
+            dias = parse_pdf(Path(args.pdf), per_ini, per_fim)
+        else:
+            dias = baixar_dias(args.system, per_ini, per_fim)
+    except Exception as exc:
+        print(f"[erro] {exc.__class__.__name__}: {exc}")
+        if not args.dry and not args.force_day and not args.force_range and not args.quiet_failure:
+            notificar_falha(env, IDENT, exc, skip=args.no_whatsapp)
+        raise
     print(f"[parse] {len(dias)} linhas de dia extraidas")
 
     # 3. Avalia + filtra com state
