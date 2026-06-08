@@ -376,7 +376,8 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
 # ----------------------------------------------------------------------
 # DISPATCHER: baixa+normaliza dias conforme sistema
 # ----------------------------------------------------------------------
-_ABSENCE_TOKENS = ("FERIAS","ABO","ABONO","FALTA","FOLGA","FERIADO","DSR","ATESTADO")
+_ABSENCE_TOKENS = ("FERIAS","ABO","ABONO","FALTA","FOLGA","FERIADO","DSR","ATESTADO",
+                   "PONTO FACULTATIVO","FACULTATIVO")
 
 def _has_absence(raw_cells):
     for c in raw_cells or []:
@@ -417,6 +418,11 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
             absent  = _has_absence(cells)
             sem_dados = "COLETA" in ocorrencia and ("NAO" in ocorrencia or "NÃO" in ocorrencia)
             punches = d.get("marcacoes", [])
+            # Coluna de marcacoes (cell[2]) pode trazer TEXTO no lugar dos horarios
+            # (ex.: "Ponto Facultativo", "Sabado", "Feriado"): e a propria
+            # justificativa do dia. Sem marcacoes + texto ali => dia nao e a cobrar.
+            marc_col = (cells[2] if len(cells) > 2 else "").strip()
+            just_no_lugar = (not punches) and bool(re.search(r"[A-Za-zÀ-ÿ]", marc_col))
             wk = d["date"].weekday()  # 0=seg ... 4=sex ... 6=dom
             # Escala MentorH:
             #  - regular: sex/dom 07:00-19:00 (diurno)
@@ -431,12 +437,12 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
                 expected_dia = ["07:00", "19:00"]                 # diurno padrao (sex/dom)
             ocorrencia_txt = (cells[5] if len(cells) > 5 else "").strip()
             obs_txt        = (cells[6] if len(cells) > 6 else "").strip()
-            motivo = " ".join(s for s in (ocorrencia_txt, obs_txt) if s).strip()
+            motivo = " ".join(s for s in (marc_col if just_no_lugar else "", ocorrencia_txt, obs_txt) if s).strip()
             dias.append({
                 "date":       d["date"],
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
                 "punches":    punches,
-                "is_workday": bool(ch_code) and not absent and not sem_dados,
+                "is_workday": bool(ch_code) and not absent and not sem_dados and not just_no_lugar,
                 "expected":   expected_dia,
                 "motivo":     motivo,
             })
