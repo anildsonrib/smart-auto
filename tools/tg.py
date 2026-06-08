@@ -41,6 +41,8 @@ ALIASES = {
     "caca-a1":   "@santi_caca_a1_alert_bot",
     "smartauto": "@santi_smartauto_bot",
     "bot":       "@santi_smartauto_bot",
+    "trader":    "@santi_trader_sim_bot",
+    "sim":       "@santi_trader_sim_bot",
 }
 
 def resolve(alvo: str):
