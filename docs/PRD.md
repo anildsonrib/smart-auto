@@ -61,7 +61,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - `sex 21h`: roda `checar_retry.py --scheduled --system ss`
 - `seg 06h`: roda `checar_retry.py --scheduled --system eb` (cobre plantao de domingo + extras da semana)
 - `horario min 30`: `checar_retry.py --retry` reexecuta de hora em hora apenas os sistemas pendentes.
-- `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: mes corrente.
+- `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: ciclo do RH (dia 20 do mes anterior ao dia 20 do mes corrente; datas futuras ignoradas).
 - `diario 16h --system ss` e `--system eb`: justificativa Sesa e MentorH (online, qualquer dia/hora vale). Dispara somente em dia 1 do mes, sem shift. Range: mes anterior fechado.
 - Em todos os casos: `justificativa.py` chama `monitor_ponto.py --force-range`, respeita carencia de 4h, motivo na folha (atestado/abono/etc) e so envia se houver pendencia real.
 - Notificacao de cron via WhatsApp; falha de download/login tambem gera alerta WhatsApp quando possivel.

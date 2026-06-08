@@ -47,7 +47,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 ## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
 
 - **Gatilhos**: 3 crons distintos na VM.
-  - `0 9 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 8 e 21; weekend shift = quinta+segunda. Range: mes corrente.
+  - `0 9 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 8 e 21; weekend shift = quinta+segunda. Range: dia 20 do mes anterior ao dia 20 do mes corrente (ciclo do RH; futuras ignoradas).
   - `0 16 * * * --system ss`: justificativa Sesa (online). Dia 1 sem shift. Range: mes anterior.
   - `0 16 * * * --system eb`: justificativa MentorH (online). Dia 1 sem shift. Range: mes anterior.
 - **Regras**: definidas no dict `RULES` (days, weekend_shift, periodo, subtitulo) dentro de `justificativa.py`.

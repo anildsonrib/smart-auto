@@ -113,7 +113,7 @@ python telegram_bot.py
 0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system ss   # ss (Secullum)
 0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system eb   # eb (MentorH), cobre plantao de domingo
 30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1   # retry horario (min 30): so reexecuta sistemas pendentes
-0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range mes corrente
+0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range 20 do mes anterior a 20 do mes corrente
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
 
