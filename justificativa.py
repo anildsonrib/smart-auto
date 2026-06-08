@@ -31,8 +31,10 @@ RULES = {
     "st": {
         "days": [8, 21],
         "weekend_shift": True,
-        # st: justificativa manual no dia, checa o que ja se acumulou no mes corrente
-        "periodo": "mes_corrente",
+        # st: RH Senior fecha competencia no dia 20. Os disparos (8 e 21) cobrem o
+        # ciclo aberto = dia 20 do mes anterior ao dia 20 do mes corrente. Datas
+        # futuras sao ignoradas pelo monitor (--force-range).
+        "periodo": "ciclo20",
         "subtitulo": "Chegou o dia de fazer a justificativa de ponto em Santi RH. Verifique as pendencias abaixo:",
     },
     "ss": {
@@ -71,6 +73,23 @@ def deve_notificar(hoje: date, rule: dict) -> bool:
     return hoje in datas
 
 
+def periodo_range(hoje: date, rule: dict) -> tuple[date, date]:
+    """Retorna (ini, fim) do range a avaliar conforme o periodo da regra."""
+    p = rule["periodo"]
+    if p == "mes_anterior":
+        # ss/eb: mes anterior fechado (dia 1 ao ultimo dia do mes anterior)
+        fim_d = hoje.replace(day=1) - timedelta(days=1)
+        ini_d = fim_d.replace(day=1)
+    elif p == "ciclo20":
+        # st: ciclo do RH Senior, dia 20 do mes anterior ao dia 20 do mes corrente
+        fim_d = hoje.replace(day=20)
+        ini_d = (hoje.replace(day=1) - timedelta(days=1)).replace(day=20)
+    else:  # mes_corrente: dia 1 do mes corrente ate hoje
+        ini_d = hoje.replace(day=1)
+        fim_d = hoje
+    return ini_d, fim_d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--system", choices=list(RULES.keys()), required=True)
@@ -81,13 +100,7 @@ def main():
         print(f"[skip] {HOJE} nao e dia de justificativa {args.system}.")
         return 0
 
-    if rule["periodo"] == "mes_anterior":
-        primeiro_dia_mes = HOJE.replace(day=1)
-        fim_d = primeiro_dia_mes - timedelta(days=1)
-        ini_d = fim_d.replace(day=1)
-    else:
-        ini_d = HOJE.replace(day=1)
-        fim_d = HOJE
+    ini_d, fim_d = periodo_range(HOJE, rule)
     ini, fim = ini_d.isoformat(), fim_d.isoformat()
     print(f"[run] justificativa {args.system} {ini} a {fim}")
     r = subprocess.run(
