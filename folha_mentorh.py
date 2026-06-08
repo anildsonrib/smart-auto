@@ -48,6 +48,7 @@ CACHE_SECONDS = 600  # 10 min: mesmo TTL do PDF do Senior
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148"
 
+_WD_ABBR  = ("SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM")  # Python weekday()->rotulo do espelho
 _RE_LINHA = re.compile(r"^\s*(\d{1,2})\s+(SEG|TER|QUA|QUI|SEX|S[ÁA]B|DOM)\b", re.I)
 _RE_HORA  = re.compile(r"(\d{2}:\d{2})")
 _RE_CELL  = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.I | re.S)
@@ -117,6 +118,10 @@ def _baixar_periodo(s: requests.Session, espelho_url: str, ini: date, fim: date)
     # ajusta periodo
     inputs["atualPrimData"] = str(_to_horolog(ini))
     inputs["atualUltData"]  = str(_to_horolog(fim))
+    # O servidor usa mesAno (MM/AAAA) como competencia; sem isso ele ignora o
+    # override de datas e devolve o ultimo mes fechado. O espelho e mensal: usa
+    # o mes de `ini` (requests do monitor/justificativa sao sempre dentro de 1 mes).
+    inputs["mesAno"] = f"{ini.month:02d}/{ini.year}"
     # POST
     action = re.search(r"<form[^>]*action=[\"']([^\"']+)[\"']", r.text, re.I)
     post_url = action.group(1) if action else espelho_url.split("?")[0]
@@ -145,6 +150,17 @@ def _parse(html: str, ini: date, fim: date) -> list[dict]:
             except ValueError:
                 continue
         if d is None: continue
+        # Guarda: o espelho deve devolver o periodo solicitado. Se o dia-da-semana
+        # da linha nao casa com o weekday real da data calculada, o espelho retornou
+        # OUTRA competencia (tipicamente o ultimo mes fechado) e mapear o numero do
+        # dia sobre o mes pedido geraria datas/plantoes/extras fantasmas. Falha
+        # explicita em vez de corromper silenciosamente (vira retry/alerta tratado).
+        if wk and wk != _WD_ABBR[d.weekday()]:
+            raise RuntimeError(
+                f"[mentorh] espelho devolveu periodo divergente do solicitado "
+                f"[{ini.isoformat()}..{fim.isoformat()}]: linha '{cells[0]}' marca '{wk}', "
+                f"mas {d.isoformat()} e '{_WD_ABBR[d.weekday()]}'"
+            )
         hor_str = cells[2] if len(cells) > 2 else ""
         punches = _RE_HORA.findall(hor_str)
         out.append({
