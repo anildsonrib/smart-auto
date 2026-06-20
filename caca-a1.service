@@ -8,7 +8,10 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/smart_auto
 ExecStart=/home/ubuntu/venv/bin/python /home/ubuntu/smart_auto/provisionar_a1.py
-Restart=no
+# Sucesso e abort intencional saem com exit 0 (nao reiniciam); so crash (exit!=0)
+# e recuperado. Evita ficar morto por erro transitorio da OCI.
+Restart=on-failure
+RestartSec=30
 StandardOutput=append:/home/ubuntu/smart_auto/caca_a1.log
 StandardError=append:/home/ubuntu/smart_auto/caca_a1.log
 

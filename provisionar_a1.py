@@ -181,9 +181,14 @@ def main():
     tentativas = 0
     while True:
         tentativas += 1
-        # Salvaguarda: ja existe uma A1?
-        existing = [i for i in compute.list_instances(compartment_id=COMPARTMENT).data
-                    if i.shape == SHAPE and i.lifecycle_state in ("RUNNING","PROVISIONING","STARTING")]
+        # Salvaguarda: ja existe uma A1? Tolera 5xx/transitorio da OCI no pre-check
+        # (senao um Internal Error aqui derruba o processo, fora do try do launch).
+        try:
+            existing = [i for i in compute.list_instances(compartment_id=COMPARTMENT).data
+                        if i.shape == SHAPE and i.lifecycle_state in ("RUNNING","PROVISIONING","STARTING")]
+        except oci.exceptions.ServiceError as e:
+            log(f"  list_instances falhou (status={e.status} code={e.code}); aguardando {INTERVAL_S}s...")
+            time.sleep(INTERVAL_S); continue
         if existing:
             inst = existing[0]
             msg = f"⚠️ Ja existe A1 ativa: `{inst.display_name}` ({inst.lifecycle_state}). Parando caca."
