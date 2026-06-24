@@ -117,20 +117,26 @@ def parse_pdf(pdf_path: Path, ini: date, fim: date, expected_count: int | None =
             # fora do range solicitado - ignora
             continue
         horas = RE_HORA.findall(resto)
-        # Linha tem: Originais + Tratadas + Trabalho [+ HE60 + HE100 + AdNot + Debito/Credito]
-        # 1) Caso normal: Originais == Tratadas -> heuristica simetrica.
-        # 2) Caso ajustado por RH: Originais tem menos itens que Tratadas (usuario nao bateu
-        #    todos os pontos, RH preencheu via tratativa). Tratadas reflete o que vale.
-        #    Pegamos os ultimos `expected_count` valores antes do total Trabalho (penultima
-        #    janela). Vale tambem para o caso normal.
+        # A linha traz Originais e Tratadas como duas sequencias CRESCENTES de
+        # horarios, seguidas dos totais (Trabalho, HE, Debito/Credito) que quebram a
+        # ordem crescente. Separa em "runs" crescentes: a 1a e Originais, a 2a e
+        # Tratadas (o que vale apos ajuste do RH). Usa Tratadas quando existe e comeca
+        # na mesma marcacao das Originais (evita confundir com um total). Assim, se o
+        # usuario esquece ate a ULTIMA batida (Originais vira prefixo das Tratadas),
+        # ainda pegamos a marcacao preenchida pelo RH (ex.: 13:00 "Esquecimento").
         punches = []
         if hor == "0260" and horas:
-            for n in range(len(horas) // 2, 0, -1):
-                if horas[:n] == horas[n:2*n]:
-                    punches = horas[:n]
-                    break
-            if not punches and expected_count and len(horas) > expected_count:
-                punches = horas[-(expected_count + 1):-1]
+            runs, atual = [], [horas[0]]
+            for h in horas[1:]:
+                if _hhmm_to_min(h) > _hhmm_to_min(atual[-1]):
+                    atual.append(h)
+                else:
+                    runs.append(atual); atual = [h]
+            runs.append(atual)
+            if len(runs) >= 2 and runs[1][0] == runs[0][0]:
+                punches = runs[1]          # Tratadas
+            else:
+                punches = runs[0]          # so Originais disponivel
         # Texto da ocorrencia = "resto" sem as marcacoes (horarios HH:MM)
         motivo = RE_HORA.sub("", resto).strip()
         absent = _has_absence([motivo]) if motivo else False
