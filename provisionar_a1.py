@@ -234,9 +234,6 @@ def main():
         except oci.exceptions.ServiceError as e:
             if e.status == 500 and "Out of host capacity" in (e.message or ""):
                 log(f"  out of capacity ({fd}). aguardando {INTERVAL_S}s...")
-                # Heartbeat: 1 ping a cada 500 tentativas pra confirmar vida sem encher chat
-                if tentativas % 500 == 0:
-                    tg(f"💓 caca-a1 vivo: {tentativas} tentativas, ainda sem capacidade.")
             elif e.status == 500 and "InternalError" in (e.code or ""):
                 log(f"  internal error ({e.message}). aguardando {INTERVAL_S}s...")
             elif e.status == 429 or "TooManyRequests" in (e.code or ""):
@@ -257,6 +254,11 @@ def main():
             msg = f"❌ *Caca A1 abortada*\n`{type(e).__name__}: {e}`"
             log(msg); tg(msg); return
 
+        # Heartbeat: 1 ping a cada 500 tentativas, qualquer que seja o erro
+        # transitorio (out-of-capacity, LimitExceeded, InternalError, rate-limit),
+        # pra confirmar vida sem encher o chat. Sucesso/abort saem por return antes daqui.
+        if tentativas % 500 == 0:
+            tg(f"💓 caca-a1 vivo: {tentativas} tentativas, ainda sem A1.")
         time.sleep(INTERVAL_S)
 
 if __name__ == "__main__":
