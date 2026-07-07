@@ -383,7 +383,7 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
 # DISPATCHER: baixa+normaliza dias conforme sistema
 # ----------------------------------------------------------------------
 _ABSENCE_TOKENS = ("FERIAS","ABO","ABONO","FALTA","FOLGA","FERIADO","DSR","ATESTADO",
-                   "PONTO FACULTATIVO","FACULTATIVO")
+                   "PONTO FACULTATIVO","FACULTATIVO","SEM JORNADA")
 
 def _has_absence(raw_cells):
     for c in raw_cells or []:
