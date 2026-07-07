@@ -293,6 +293,26 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
 # ----------------------------------------------------------------------
 # WHATSAPP
 # ----------------------------------------------------------------------
+def _send_telegram(env, message: str) -> bool:
+    """Fallback quando o CallMeBot falha: mesma mensagem no chat do Telegram."""
+    token   = env.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = env.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        print("[telegram] TELEGRAM_BOT_TOKEN/CHAT_ID nao configurados, sem fallback.")
+        return False
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": message},
+            timeout=20,
+        )
+        ok = r.status_code == 200
+        print(f"[telegram] fallback status={r.status_code}")
+        return ok
+    except requests.RequestException as e:
+        print(f"[telegram] fallback falhou: {_erro_curto(e)}")
+        return False
+
 def send_whatsapp(env, message: str, skip: bool = False):
     if skip:
         print("[whatsapp] skip (--no-whatsapp)")
@@ -302,13 +322,24 @@ def send_whatsapp(env, message: str, skip: bool = False):
     if not phone or not apikey:
         print("[whatsapp] CALLMEBOT_PHONE/APIKEY nao configurados, pulando envio.")
         return False
-    r = requests.get(
-        "https://api.callmebot.com/whatsapp.php",
-        params={"phone": phone, "text": message, "apikey": apikey},
-        timeout=20,
-    )
-    ok = r.status_code == 200 and "queued" in r.text.lower() or "success" in r.text.lower()
-    print(f"[whatsapp] status={r.status_code} resp={r.text[:100]}")
+    try:
+        r = requests.get(
+            "https://api.callmebot.com/whatsapp.php",
+            params={"phone": phone, "text": message, "apikey": apikey},
+            timeout=20,
+        )
+        low = r.text.lower()
+        ok = r.status_code == 200 and ("queued" in low or "success" in low)
+        # O CallMeBot ecoa a mensagem antes do veredito; loga so o veredito
+        # (tudo apos o ultimo <p>) para nao truncar a parte que importa.
+        verdict = r.text.rsplit("<p>", 1)[-1].strip()[:200]
+        print(f"[whatsapp] status={r.status_code} ok={ok} verdict={verdict}")
+    except requests.RequestException as e:
+        ok = False
+        print(f"[whatsapp] falhou: {_erro_curto(e)}")
+    if not ok:
+        print("[whatsapp] envio falhou; tentando fallback via Telegram.")
+        return _send_telegram(env, message)
     return ok
 
 def _erro_curto(exc: BaseException) -> str:
