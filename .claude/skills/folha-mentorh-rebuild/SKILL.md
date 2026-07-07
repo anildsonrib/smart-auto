@@ -46,32 +46,50 @@ r2 = s.post(BROKER, data={"WARGC":"1","WEVENT":wevent_menu,"WARG_1":"100.3.6.1"}
 url_espelho = re.search(r"\.debug-csp'\)\.val\('([^']+)'\)", r2.text).group(1)
 ```
 
-### 4. Baixar espelho do periodo
+### 4. Baixar espelho do periodo (grid DataTables server-side, desde jul/2026)
+
+A pagina do espelho NAO traz mais a tabela no HTML (antes era POST do form com
+`atualPrimData`/`atualUltData` em $HOROLOG + parse de `<tr>`). Desde jul/2026 o
+grid e DataTables `serverSide: true` carregado por hyperevent CSP:
 
 ```python
-# GET inicial pra pegar hidden fields (pagservId, pagservMatr, CSPToken, etc)
+# GET da pagina do espelho -> extrai token do grid e matricula
 r = s.get(HOST + url_espelho, timeout=90)
-inputs = dict(re.findall(r"<input[^>]*name=\"([^\"]+)\"[^>]*value=\"([^\"]*)\"", r.text))
+m = re.search(r"cspHttpServerMethod\('([^']+)',JSON\.stringify\(data\),'(\d+)'", r.text)
+token, matricula = m.groups()
 
-# Ajusta periodo em $HOROLOG (dias desde 1840-12-31)
-EPOCH = date(1840, 12, 31)
-inputs["atualPrimData"] = str((ini - EPOCH).days)
-inputs["atualUltData"]  = str((fim - EPOCH).days)
+# broker RELATIVO ao diretorio da pagina (cspxmlhttp.js usa URL relativa)
+broker = url_espelho.split("?")[0].rsplit("/", 1)[0] + "/%CSP.Broker.cls"
 
-# POST -> HTML com tabela
-r2 = s.post(action_url, data=inputs, timeout=90)
+# request DataTables + competencia MM/AAAA (espelho e mensal)
+cols = [{"data": c, "name": "", "searchable": True, "orderable": False,
+         "search": {"value": "", "regex": False}}
+        for c in ("Dia","CHCodigo","HorarioTrabalhado","CHConsiderada","Saldo","Ocorrencia")]
+dt_req = {"draw": 1, "columns": cols, "order": [], "start": 0,
+          "length": 31, "search": {"value": "", "regex": False}}
+r2 = s.post(broker, timeout=300,   # servidor leva ~90s para montar o espelho
+            data={"WARGC": "3", "WEVENT": token, "WARG_1": json.dumps(dt_req),
+                  "WARG_2": matricula, "WARG_3": f"{ini.month:02d}/{ini.year}"})
 ```
 
-## Parse da tabela
+## Parse da resposta do hyperevent
 
-Cada `<tr>` valido tem 7 colunas: `Dia | (CH) | Horario Trabalhado | H.C. | Saldo | Ocorrencia | Obs`.
+A resposta e texto CSP: linhas de controle, marcador `#OK` e o JSON em seguida.
 
+```python
+payload = r2.text[r2.text.find("#OK") + 3:].strip()
+rows = json.loads(payload)["data"]
 ```
-1 SEX | 0586 | 06:55r - 19:08r | 12:13 | + 00:13 | feriado nacional |
-3 DOM | 0586 | 06:57r - 19:01r | 12:00 |          |                    |
-15 SEX| 0586 | Afastamento     | 12:00 |          | abono (act)        |
-18 SEG|      | Coleta nao realizada |    |          | coleta nao real    |
-```
+
+Cada row: `{"Dia": "03  sex", "CHCodigo": 586, "HorarioTrabalhado": "07:05r - 19:15r",
+"CHConsiderada": "12:10", "Saldo": " + 00:10", "Ocorrencia": "", "mes_ano": "07/2026", ...}`.
+Dias sem batida trazem `Ocorrencia: "Coleta Não Realizada"`. Reconstruir `raw` na
+ordem `[Dia, CHCodigo, HorarioTrabalhado, CHConsiderada, Saldo, Ocorrencia]` para
+manter o contrato com `monitor_ponto.py` (cells[1]=CH, cells[2]=horarios/justificativa).
+
+Guarda de competencia: validar `mes_ano` de cada row contra o MM/AAAA solicitado
+(e o dia-da-semana da coluna `Dia` contra a data calculada) - competencia divergente
+geraria plantoes/extras fantasmas; falhar explicito.
 
 Sufixo `r` = registro REP real. Pares "HH:MMr - HH:MMr" sao entrada/saida. Cross-midnight para plantao noturno: `19:00r - 07:00r`.
 
@@ -102,6 +120,7 @@ Mesmo padrao do Secullum: JSON em `cache/mentorh_<ini>_<fim>.json`, TTL 600s. Em
 
 - **Path `%CSP.Broker.cls`**: o `%` precisa ser URL-encoded em GET (`%25CSP.Broker.cls`), mas em POST com `requests` passa direto.
 - **WEVENT mismatch**: tem varios `mountAjaxData` no HTML; pegue o correto pelo argumento que segue (ex: `$('#login').val()` vs `attr('menu')`). Pegar o errado retorna erro Cache `CLASS DOES NOT EXIST`.
-- **Servidor lento via VM cloud**: timeouts >= 90s nas chamadas finais. Local pega em 5-10s, da VM Oracle em ~35s.
+- **Servidor lento via VM cloud**: o hyperevent do grid leva ~90s para responder (o servidor monta o espelho sob demanda); usar timeout >= 300s. Uma resposta que "trava" nao e erro - e espera normal.
+- **Pagina esqueleto (~5 KB) com 0 linhas parseadas**: sinal de que o fluxo antigo (POST do form) esta sendo usado contra o grid novo - o HTML so tem o setup do DataTables; os dados vem exclusivamente pelo hyperevent.
 - **Senha com `#`**: o `.env` parser deve aceitar valor entre aspas e remover delimitadores (`"hx71bz!#"` -> `hx71bz!#`).
 - **Cross-midnight**: o `_alinhar` DP do monitor assume marcacoes em ordem cronologica do dia. Plantao noturno vira 2 linhas no espelho (entrada no dia X, saida no dia X+1) - daí o override de `expected` por dia.

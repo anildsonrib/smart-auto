@@ -6,8 +6,8 @@ Fluxo:
 3. POST %CSP.Broker.cls com cpf+senha (login)
 4. GET /portal.csp logado -> extrai WEVENT do "acessarMenu"
 5. POST %CSP.Broker.cls com menu=100.3.6.1 -> extrai CSPToken do espelho
-6. POST portalRegFrequencia5.csp com periodo (atualPrimData/atualUltData)
-7. Parseia tabela HTML
+6. GET portalRegFrequencia5.csp -> extrai token do grid DataTables
+7. POST %CSP.Broker.cls (hyperevent) com mesAno -> JSON das linhas do espelho
 
 Sem browser. Roda em qualquer maquina com Python + requests.
 """
@@ -15,7 +15,7 @@ import json
 import re
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -42,7 +42,6 @@ BROKER = f"{BASE}/%CSP.Broker.cls"
 USER   = ENV_VARS.get("MENTORH_USERNAME", "")
 PWD    = ENV_VARS.get("MENTORH_PASSWORD", "")
 MENU   = "100.3.6.1"  # Folha de Frequencia
-EPOCH  = date(1840, 12, 31)  # Intersystems Cache $HOROLOG
 CACHE_DIR     = ROOT / "cache"
 CACHE_SECONDS = 600  # 10 min: mesmo TTL do PDF do Senior
 
@@ -51,13 +50,8 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148"
 _WD_ABBR  = ("SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM")  # Python weekday()->rotulo do espelho
 _RE_LINHA = re.compile(r"^\s*(\d{1,2})\s+(SEG|TER|QUA|QUI|SEX|S[ÁA]B|DOM)\b", re.I)
 _RE_HORA  = re.compile(r"(\d{2}:\d{2})")
-_RE_CELL  = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.I | re.S)
-_RE_ROW   = re.compile(r"<tr[^>]*>(.*?)</tr>", re.I | re.S)
 _RE_TAGS  = re.compile(r"<[^>]+>")
 _RE_WS    = re.compile(r"\s+")
-
-def _to_horolog(d: date) -> int:
-    return (d - EPOCH).days
 
 def _clean(s: str) -> str:
     s = _RE_TAGS.sub(" ", s)
@@ -103,44 +97,65 @@ def _abrir_menu(s: requests.Session, codigo: str) -> str:
     rel = m2.group(1)  # /csp/.../portalRegFrequencia5.csp?CSPToken=...
     return HOST + rel
 
-def _baixar_periodo(s: requests.Session, espelho_url: str, ini: date, fim: date) -> str:
-    """GET inicial p/ pegar hidden fields, depois POST com periodo ajustado."""
+def _baixar_periodo(s: requests.Session, espelho_url: str, ini: date, fim: date) -> list[dict]:
+    """Busca as linhas do espelho via hyperevent CSP (DataTables server-side).
+
+    A pagina do espelho nao traz mais a tabela no HTML: o grid carrega por AJAX
+    chamando cspHttpServerMethod(token, JSON.stringify(dtReq), matricula, mesAno)
+    contra o %CSP.Broker do diretorio da pagina. Retorna a lista de rows JSON.
+    """
     r = s.get(espelho_url, timeout=90, headers={
         "Referer": f"{BASE}/portal.csp",
     })
-    # extrai TODOS os inputs hidden do form
-    form = re.search(r"<form[^>]*>(.*?)</form>", r.text, re.I | re.S)
-    if not form: raise RuntimeError("[mentorh] form nao encontrado na resposta")
-    inputs = dict(re.findall(
-        r"<input[^>]*name=[\"']([^\"']+)[\"'][^>]*value=[\"']([^\"']*)[\"']",
-        form.group(1), re.I,
-    ))
-    # ajusta periodo
-    inputs["atualPrimData"] = str(_to_horolog(ini))
-    inputs["atualUltData"]  = str(_to_horolog(fim))
-    # O servidor usa mesAno (MM/AAAA) como competencia; sem isso ele ignora o
-    # override de datas e devolve o ultimo mes fechado. O espelho e mensal: usa
-    # o mes de `ini` (requests do monitor/justificativa sao sempre dentro de 1 mes).
-    inputs["mesAno"] = f"{ini.month:02d}/{ini.year}"
-    # POST
-    action = re.search(r"<form[^>]*action=[\"']([^\"']+)[\"']", r.text, re.I)
-    post_url = action.group(1) if action else espelho_url.split("?")[0]
-    if post_url.startswith("/"): post_url = HOST + post_url
-    r2 = s.post(post_url, data=inputs, timeout=90, headers={
+    m = re.search(
+        r"cspHttpServerMethod\('([^']+)',JSON\.stringify\(data\),'(\d+)'", r.text)
+    if not m:
+        raise RuntimeError(f"[mentorh] token do grid nao encontrado na pagina do espelho: {r.text[:300]}")
+    token, matricula = m.groups()
+    # broker relativo ao diretorio da pagina (cspxmlhttp.js usa URL relativa)
+    broker = espelho_url.split("?")[0].rsplit("/", 1)[0] + "/%CSP.Broker.cls"
+    # O espelho e mensal: usa o mes de `ini` (requests do monitor/justificativa
+    # sao sempre dentro de 1 mes).
+    mes_ano = f"{ini.month:02d}/{ini.year}"
+    cols = [{"data": c, "name": "", "searchable": True, "orderable": False,
+             "search": {"value": "", "regex": False}}
+            for c in ("Dia", "CHCodigo", "HorarioTrabalhado", "CHConsiderada",
+                      "Saldo", "Ocorrencia")]
+    dt_req = {"draw": 1, "columns": cols, "order": [], "start": 0,
+              "length": 31, "search": {"value": "", "regex": False}}
+    # o servidor leva ~90s para montar o espelho; timeout folgado
+    r2 = s.post(broker, timeout=300, headers={
         "Referer": espelho_url,
         "Content-Type": "application/x-www-form-urlencoded",
-    })
-    return r2.text
+    }, data={"WARGC": "3", "WEVENT": token, "WARG_1": json.dumps(dt_req),
+             "WARG_2": matricula, "WARG_3": mes_ano})
+    # resposta hyperevent: linhas de controle, "#OK" e o payload JSON em seguida
+    pos = r2.text.find("#OK")
+    if pos < 0:
+        raise RuntimeError(f"[mentorh] hyperevent sem #OK: {r2.text[:300]}")
+    payload = r2.text[pos + 3:].strip()
+    try:
+        data = json.loads(payload)
+    except ValueError as e:
+        raise RuntimeError(f"[mentorh] JSON invalido do grid: {payload[:300]}") from e
+    rows = data.get("data") or []
+    # Guarda: o espelho deve devolver a competencia solicitada; competencia
+    # divergente geraria datas/plantoes/extras fantasmas.
+    for row in rows:
+        got = (row.get("mes_ano") or "").replace("\\", "")
+        if got and got != mes_ano:
+            raise RuntimeError(
+                f"[mentorh] espelho devolveu competencia {got}, solicitada {mes_ano}")
+    return rows
 
-def _parse(html: str, ini: date, fim: date) -> list[dict]:
+def _parse(rows: list[dict], ini: date, fim: date) -> list[dict]:
     out = []
-    for row in _RE_ROW.findall(html):
-        cells = [_clean(c) for c in _RE_CELL.findall(row)]
-        if len(cells) < 4: continue
-        m = _RE_LINHA.match(cells[0])
+    for row in rows:
+        # "Dia": "03  sex"
+        m = _RE_LINHA.match(str(row.get("Dia") or ""))
         if not m: continue
         dia = int(m.group(1))
-        wk  = m.group(2).upper().replace("Á","A")[:3]
+        wk  = m.group(2).upper().replace("Á", "A")[:3]
         d = None
         for cand_mes, cand_ano in ((ini.month, ini.year), (fim.month, fim.year)):
             try:
@@ -150,19 +165,19 @@ def _parse(html: str, ini: date, fim: date) -> list[dict]:
             except ValueError:
                 continue
         if d is None: continue
-        # Guarda: o espelho deve devolver o periodo solicitado. Se o dia-da-semana
-        # da linha nao casa com o weekday real da data calculada, o espelho retornou
-        # OUTRA competencia (tipicamente o ultimo mes fechado) e mapear o numero do
-        # dia sobre o mes pedido geraria datas/plantoes/extras fantasmas. Falha
-        # explicita em vez de corromper silenciosamente (vira retry/alerta tratado).
+        # Guarda extra: dia-da-semana da linha deve casar com a data calculada.
         if wk and wk != _WD_ABBR[d.weekday()]:
             raise RuntimeError(
                 f"[mentorh] espelho devolveu periodo divergente do solicitado "
-                f"[{ini.isoformat()}..{fim.isoformat()}]: linha '{cells[0]}' marca '{wk}', "
+                f"[{ini.isoformat()}..{fim.isoformat()}]: linha '{row.get('Dia')}' marca '{wk}', "
                 f"mas {d.isoformat()} e '{_WD_ABBR[d.weekday()]}'"
             )
-        hor_str = cells[2] if len(cells) > 2 else ""
-        punches = _RE_HORA.findall(hor_str)
+        # cells na mesma ordem das colunas da tabela antiga, p/ manter o
+        # contrato com monitor_ponto (cells[1]=CH, cells[2]=horarios/justif).
+        cells = [_clean(str(row.get(k) if row.get(k) is not None else ""))
+                 for k in ("Dia", "CHCodigo", "HorarioTrabalhado",
+                           "CHConsiderada", "Saldo", "Ocorrencia")]
+        punches = _RE_HORA.findall(cells[2])
         out.append({
             "date":      d,
             "weekday":   wk,
@@ -201,8 +216,8 @@ def baixar(ini: date, fim: date) -> list[dict]:
     _login(s)
     print(f"[download] mentorh espelho {ini.isoformat()} a {fim.isoformat()}")
     espelho = _abrir_menu(s, MENU)
-    html = _baixar_periodo(s, espelho, ini, fim)
-    dias = _parse(html, ini, fim)
+    rows = _baixar_periodo(s, espelho, ini, fim)
+    dias = _parse(rows, ini, fim)
     _save_cache(ini, fim, dias)
     return dias
 
