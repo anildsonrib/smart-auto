@@ -250,6 +250,10 @@ def main():
                        f"status={e.status} code={e.code}\n"
                        f"`{(e.message or '')[:300]}`")
                 log(msg); tg(msg); return
+        except oci.exceptions.RequestException as e:
+            # Erro de TRANSPORTE (read/connect timeout, DNS, reset): nao e ServiceError.
+            # Sem este branch cai no abort generico e mata o hunter num soluco de rede.
+            log(f"  erro de transporte OCI ({type(e).__name__}); aguardando {INTERVAL_S}s...")
         except Exception as e:
             msg = f"❌ *Caca A1 abortada*\n`{type(e).__name__}: {e}`"
             log(msg); tg(msg); return
