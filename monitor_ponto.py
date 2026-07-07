@@ -383,12 +383,15 @@ def baixar_pdf_periodo(ini: date, fim: date) -> Path:
 # DISPATCHER: baixa+normaliza dias conforme sistema
 # ----------------------------------------------------------------------
 _ABSENCE_TOKENS = ("FERIAS","ABO","ABONO","FALTA","FOLGA","FERIADO","DSR","ATESTADO",
-                   "PONTO FACULTATIVO","FACULTATIVO","SEM JORNADA")
+                   "PONTO FACULTATIVO","FACULTATIVO")
+# So no MentorH (eb): folga de domingo (nao fixa, 1x/mes) vem com CH preenchida
+# e Ocorrencia='Sem Jornada'. Nos outros sistemas essa expressao nao e usada.
+_ABSENCE_TOKENS_EB = _ABSENCE_TOKENS + ("SEM JORNADA",)
 
-def _has_absence(raw_cells):
+def _has_absence(raw_cells, tokens=_ABSENCE_TOKENS):
     for c in raw_cells or []:
         cu = c.upper().strip()
-        if any(cu == t or cu.startswith(t) for t in _ABSENCE_TOKENS):
+        if any(cu == t or cu.startswith(t) for t in tokens):
             return True
     return False
 
@@ -421,7 +424,7 @@ def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
             cells = d.get("raw", [])
             ch_code  = (cells[1] if len(cells) > 1 else "").strip()
             ocorrencia = " ".join(cells).upper()
-            absent  = _has_absence(cells)
+            absent  = _has_absence(cells, _ABSENCE_TOKENS_EB)
             sem_dados = "COLETA" in ocorrencia and ("NAO" in ocorrencia or "NÃO" in ocorrencia)
             punches = d.get("marcacoes", [])
             # Coluna de marcacoes (cell[2]) pode trazer TEXTO no lugar dos horarios
