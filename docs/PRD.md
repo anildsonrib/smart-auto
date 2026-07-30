@@ -57,9 +57,11 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 
 ### 4.5 Cron na VM
 
-- `sex 15h`: roda `checar_retry.py --scheduled --system st` (wrapper injeta `--no-state`)
-- `sex 21h`: roda `checar_retry.py --scheduled --system ss`
-- `seg 06h`: roda `checar_retry.py --scheduled --system eb` (cobre plantao de domingo + extras da semana)
+- `sex 15h`: roda `checar_retry.py --scheduled --system st` (wrapper injeta `--no-state`) - via `smart-auto-check@st.timer`
+- `sex 21h`: roda `checar_retry.py --scheduled --system ss` - via `smart-auto-check@ss.timer`
+- `seg 06h`: roda `checar_retry.py --scheduled --system eb` (cobre plantao de domingo + extras da semana) - via `smart-auto-check@eb.timer`
+- As 3 checagens usam systemd timer com `Persistent=true`, nao cron: execucao perdida por VM desligada e recuperada no proximo boot. Justificativas e retry horario permanecem em cron.
+- Reboot automatico de kernel habilitado via `unattended-upgrades` as 04:15 (`deploy/52unattended-upgrades-local`), horario escolhido por nao colidir com nenhum timer ou cron da VM compartilhada.
 - `horario min 30`: `checar_retry.py --retry` reexecuta de hora em hora apenas os sistemas pendentes.
 - `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: ciclo do RH (dia 20 do mes anterior ao dia 20 do mes corrente; datas futuras ignoradas).
 - `diario 16h --system ss` e `--system eb`: justificativa Sesa e MentorH (online, qualquer dia/hora vale). Dispara somente em dia 1 do mes, sem shift. Range: mes anterior fechado.

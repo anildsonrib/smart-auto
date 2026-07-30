@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da checagem MentorH (eb)
+
+[Timer]
+OnCalendar=Mon 06:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-check@eb.service
+
+[Install]
+WantedBy=timers.target

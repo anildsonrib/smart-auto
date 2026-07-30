@@ -1,0 +1,15 @@
+[Unit]
+Description=smart_auto - checagem de ponto (%i)
+Documentation=https://github.com/<usuario>sonrib/smart-auto
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/smart_auto
+ExecStart=/home/ubuntu/venv/bin/python checar_retry.py --scheduled --system %i
+StandardOutput=append:/home/ubuntu/smart_auto/monitor.log
+StandardError=append:/home/ubuntu/smart_auto/monitor.log
+TimeoutStartSec=1800

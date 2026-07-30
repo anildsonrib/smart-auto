@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da checagem Secullum (ss)
+
+[Timer]
+OnCalendar=Fri 21:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-check@ss.service
+
+[Install]
+WantedBy=timers.target

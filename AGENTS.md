@@ -4,7 +4,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
-- **Gatilho**: cron na VM Oracle, via wrapper `checar_retry.py --scheduled`. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb). Justificativas (`diario 09h` st, `diario 16h` ss/eb) chamam `justificativa.py` direto.
+- **Gatilho**: systemd timer na VM Oracle (`smart-auto-check@<sys>.timer`, `Persistent=true`), via wrapper `checar_retry.py --scheduled`. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb). Nao e cron: se a VM estiver desligada no horario, o timer recupera a execucao no proximo boot. Justificativas (`diario 09h` st, `diario 16h` ss/eb) seguem em cron e chamam `justificativa.py` direto - **essas ainda sao perdidas se a VM estiver desligada no horario**.
 - **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao WhatsApp quando houver pendencias vencidas, mesmo se ja notificadas em execucao anterior.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
@@ -13,7 +13,8 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 1.5 Retry de coleta (`checar_retry.py --scheduled|--retry`)
 
-- **Gatilho**: cron na VM Oracle. `--scheduled` nas 3 checagens semanais; `--retry` a cada hora no minuto 30 (`30 * * * *`).
+- **Gatilho**: `--scheduled` pelos 3 systemd timers das checagens semanais; `--retry` por cron a cada hora no minuto 30 (`30 * * * *`).
+- **Limite conhecido**: o retry cobre **falha de execucao** (exit != 0), nao **ausencia de execucao**. Se o job nunca rodar, nada e registrado. Por isso as checagens semanais usam timer com `Persistent=true` em vez de cron.
 - **Funcao**: tornar a checagem resiliente a indisponibilidade do sistema de ponto. `--scheduled` roda o monitor (`--no-state`) e, se falhar (exit != 0), registra o sistema em `retry_state.json`. `--retry` reexecuta de hora em hora apenas os sistemas pendentes (`--no-state --quiet-failure`).
 - **Independencia**: por sistema (`st`, `ss`, `eb`) - cada um retenta isolado.
 - **Estado**: le/escreve `retry_state.json` (since/attempts/last_error), runtime, fora do git. Escrita atomica + lock local.

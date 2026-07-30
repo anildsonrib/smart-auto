@@ -64,6 +64,9 @@ Saidas:
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
 | `smart-auto-bot.service`| systemd unit do bot |
 | `caca-a1.service`       | systemd unit do hunter A1 |
+| `smart-auto-check@.service` | systemd unit template das checagens semanais (instanciada por sistema: `@st`, `@ss`, `@eb`) |
+| `smart-auto-check@<sys>.timer` | timers das checagens com `Persistent=true` (recupera execucao perdida se a VM estava desligada) |
+| `deploy/52unattended-upgrades-local` | politica de reboot automatico do kernel (04:15) |
 | `deploy/cloud-init.yaml`| Bootstrap inicial da VM (usuario + chave SSH) |
 | `.env`                  | Credenciais e tokens (ver `.env.example` abaixo) |
 | `monitor_state.json`    | Dias ja notificados, por sistema |
@@ -107,11 +110,19 @@ python telegram_bot.py
 
 ### VM Oracle
 
+As tres checagens semanais rodam via **systemd timer** (nao cron), para nao serem
+perdidas se a VM estiver desligada no horario. As justificativas e o retry horario
+seguem em cron.
+
 ```bash
+# checagens semanais: timers com Persistent=true
+sudo cp 'smart-auto-check@.service' 'smart-auto-check@'*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now 'smart-auto-check@st.timer'   # sex 15h (Senior)
+sudo systemctl enable --now 'smart-auto-check@ss.timer'   # sex 21h (Secullum)
+sudo systemctl enable --now 'smart-auto-check@eb.timer'   # seg 06h (MentorH, cobre plantao de domingo)
+
 # crontab -e
-0 15 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system st   # st (Senior): wrapper injeta --no-state e registra retry se falhar
-0 21 * * 5 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system ss   # ss (Secullum)
-0  6 * * 1 cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --scheduled --system eb   # eb (MentorH), cobre plantao de domingo
 30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1   # retry horario (min 30): so reexecuta sistemas pendentes
 0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range 20 do mes anterior a 20 do mes corrente
 0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
@@ -119,7 +130,20 @@ python telegram_bot.py
 
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
+
+# politica de reboot automatico do kernel (04:15, sem colisao com nenhum job)
+sudo cp deploy/52unattended-upgrades-local /etc/apt/apt.conf.d/
 ```
+
+#### Por que timer e nao cron nas checagens
+
+Se a VM estiver desligada quando o cron dispara, o job simplesmente nao roda - e o
+`checar_retry.py` **nao** registra retry nesse caso, porque ele so registra quando o
+monitor falha, nao quando nunca foi executado. A checagem semanal seria perdida em
+silencio. Com `Persistent=true`, o systemd grava o ultimo disparo em
+`/var/lib/systemd/timers/stamp-smart-auto-check@<sys>.timer` e executa o job atrasado
+no proximo boot. Verificado em 2026-07-30 retroagindo o stamp em 14 dias: o timer
+disparou imediatamente ao ser reiniciado.
 
 #### Retry horario (falha de coleta)
 

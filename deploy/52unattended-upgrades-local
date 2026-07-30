@@ -1,0 +1,12 @@
+// smart_auto - politica local de reboot automatico.
+// Definido em arquivo separado (52 > 50) para nao ser sobrescrito
+// em upgrade do pacote unattended-upgrades.
+//
+// 04:15 escolhido por nao colidir com nenhum job agendado da VM:
+// as checagens (sex 15h/21h, seg 06h), as justificativas (09h/16h),
+// o cron de retry (todo minuto :30) nem os jobs de manutencao do SO.
+// A VM e compartilhada - antes de mudar este horario, conferir a
+// agenda real com: systemctl list-timers --all && crontab -l
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:15";

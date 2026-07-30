@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da checagem Senior (st)
+
+[Timer]
+OnCalendar=Fri 15:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-check@st.service
+
+[Install]
+WantedBy=timers.target
