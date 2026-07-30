@@ -33,6 +33,12 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 3. Hunter A1 (`provisionar_a1.py` via `caca-a1.service`)
 
+> **DESLIGADO desde 2026-07-30 por decisao do usuario.** `caca-a1` e `caca-a1-bot`
+> estao `stop` + `disable` (nao voltam em reboot). Unit files e codigo preservados.
+> Para religar: `sudo systemctl enable --now caca-a1 caca-a1-bot`.
+> Motivo: meses de polling sem conseguir capacidade A1, consumindo CPU numa VM de
+> 1 OCPU compartilhada. O restante desta secao descreve o comportamento quando ativo.
+
 - **Gatilho**: systemd, loop interno a cada `INTERVAL_S = 300`.
 - **Funcao**: tentar `LaunchInstance` na Oracle com shape `VM.Standard.A1.Flex` (4 OCPU + 24 GB hardcoded).
 - **Pre-check**: se ja existe instancia A1 ativa, aborta para evitar duplicacao.

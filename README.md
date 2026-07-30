@@ -130,7 +130,7 @@ sudo systemctl enable --now 'smart-auto-justificativa@eb.timer'   # diario 16h
 30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1   # retry horario (min 30): so reexecuta sistemas pendentes
 
 sudo systemctl enable --now smart-auto-bot.service
-sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
+#sudo systemctl enable --now caca-a1.service  # opcional; DESLIGADO desde 30/07/2026 (ver AGENTS.md secao 3)
 
 # politica de reboot automatico do kernel (04:15, sem colisao com nenhum job)
 sudo cp deploy/52unattended-upgrades-local /etc/apt/apt.conf.d/
