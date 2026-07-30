@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da justificativa Santi RH (st)
+
+[Timer]
+OnCalendar=*-*-* 09:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-justificativa@st.service
+
+[Install]
+WantedBy=timers.target

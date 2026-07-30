@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da justificativa MentorH (eb)
+
+[Timer]
+OnCalendar=*-*-* 16:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-justificativa@eb.service
+
+[Install]
+WantedBy=timers.target

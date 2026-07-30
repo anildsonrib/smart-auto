@@ -1,0 +1,11 @@
+[Unit]
+Description=smart_auto - timer da justificativa Sesa (ss)
+
+[Timer]
+OnCalendar=*-*-* 16:00
+Persistent=true
+AccuracySec=1min
+Unit=smart-auto-justificativa@ss.service
+
+[Install]
+WantedBy=timers.target

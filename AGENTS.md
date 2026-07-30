@@ -47,12 +47,14 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 
 ## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
 
-- **Gatilhos**: 3 crons distintos na VM.
+- **Gatilhos**: 3 systemd timers diarios (`smart-auto-justificativa@<sys>.timer`, `Persistent=true`).
   - `0 9 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 8 e 21; weekend shift = quinta+segunda. Range: dia 20 do mes anterior ao dia 20 do mes corrente (ciclo do RH; futuras ignoradas).
   - `0 16 * * * --system ss`: justificativa Sesa (online). Dia 1 sem shift. Range: mes anterior.
   - `0 16 * * * --system eb`: justificativa MentorH (online). Dia 1 sem shift. Range: mes anterior.
 - **Regras**: definidas no dict `RULES` (days, weekend_shift, periodo, subtitulo) dentro de `justificativa.py`.
 - **Acao**: chama `monitor_ponto.py --system <sys> --force-range INI FIM --subtitulo "..."`. `--force-range` bypassa dedup mas preserva carencia de 4h e deteccao de motivo na folha. Sem pendencia => nenhuma mensagem enviada.
+- **Catch-up**: cada data de disparo e um evento registrado em `justificativa_state.json` (`{"st": {"despachados": [...]}}`, runtime, fora do git) e marcado como cumprido **so apos exit 0**. Disparo perdido (VM desligada) ou falho e retentado por ate `CATCHUP_MAX_DAYS = 5`; depois disso e descartado com log. O range e derivado da **data de disparo**, nao de hoje - senao um catch-up avaliaria o ciclo errado. Disparos que geram o mesmo range sao coalescidos em um envio. Primeira execucao sem state absorve o historico em silencio (`[init]`).
+- **Teste**: `--dry-run` mostra o plano sem chamar o monitor nem gravar state; `--hoje YYYY-MM-DD` simula outra data.
 - **Saida**: WhatsApp via CallMeBot (monitor_ponto nao envia Telegram em modo cron).
 - **Log**: `/home/ubuntu/smart_auto/justificativa.log`.
 

@@ -60,7 +60,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - `sex 15h`: roda `checar_retry.py --scheduled --system st` (wrapper injeta `--no-state`) - via `smart-auto-check@st.timer`
 - `sex 21h`: roda `checar_retry.py --scheduled --system ss` - via `smart-auto-check@ss.timer`
 - `seg 06h`: roda `checar_retry.py --scheduled --system eb` (cobre plantao de domingo + extras da semana) - via `smart-auto-check@eb.timer`
-- As 3 checagens usam systemd timer com `Persistent=true`, nao cron: execucao perdida por VM desligada e recuperada no proximo boot. Justificativas e retry horario permanecem em cron.
+- As 3 checagens usam systemd timer com `Persistent=true`, nao cron: execucao perdida por VM desligada e recuperada no proximo boot. As 3 justificativas tambem usam timer, mas o catch-up delas exige logica propria (ver 4.5.2). Somente o retry horario permanece em cron.
 - Reboot automatico de kernel habilitado via `unattended-upgrades` as 04:15 (`deploy/52unattended-upgrades-local`), horario escolhido por nao colidir com nenhum timer ou cron da VM compartilhada.
 - `horario min 30`: `checar_retry.py --retry` reexecuta de hora em hora apenas os sistemas pendentes.
 - `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: ciclo do RH (dia 20 do mes anterior ao dia 20 do mes corrente; datas futuras ignoradas).
@@ -77,6 +77,16 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - Teto `RETRY_MAX_HOURS = 24`: entradas mais antigas sao descartadas sem novo envio.
 - Sem loop interno: cada execucao faz no maximo uma tentativa por sistema; o agendamento e do cron.
 - `retry_state.json` (estado) e `retry.log` (log do retry) sao runtime na VM, fora do git. Escrita atomica + lock local simples evitam corrida.
+
+### 4.5.2 Catch-up das justificativas
+
+- Cada data de disparo (dia 8/21 do st com weekend shift, dia 1 do ss/eb) e um evento identificavel, registrado em `justificativa_state.json` por sistema quando cumprido.
+- Marca como cumprido **somente com exit 0**. Falha do monitor mantem a data pendente para a proxima execucao.
+- Janela `CATCHUP_MAX_DAYS = 5`: disparo devido e nao cumprido dentro da janela e reexecutado mesmo fora do dia exato; mais antigo que isso e descartado com log, sem envio.
+- O range avaliado deriva da **data de disparo**, nao da data corrente - requisito de corretude: um catch-up do dia 21 executado no dia 23 tem de avaliar o ciclo do dia 21.
+- Disparos distintos que resultam no mesmo range sao coalescidos num unico envio, evitando mensagens duplicadas.
+- Primeira execucao (sem state) absorve o historico anterior a janela em silencio, sem notificar retroativamente.
+- Motivo de a logica viver no script e nao no timer: `Persistent=true` recuperaria a execucao, mas o gate interno de dia do mes rejeitaria o catch-up ("hoje nao e dia 8"), tornando a recuperacao inocua.
 
 ### 4.6 Caca A1 (opcional)
 

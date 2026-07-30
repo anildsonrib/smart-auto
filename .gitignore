@@ -11,6 +11,8 @@ oci_api_key*
 monitor_state.json
 retry_state.json
 .retry_state.lock
+justificativa_state.json
+.justificativa_state.lock
 __pycache__/
 *.pyc
 

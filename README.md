@@ -58,7 +58,8 @@ Saidas:
 | `folha_secullum.py`     | Login + scrape Secullum Ponto 4 (HTTP puro, sem browser) |
 | `folha_mentorh.py`      | Login + scrape SIGP EBSERH/MentorH (HTTP puro via %CSP.Broker.cls) |
 | `telegram_bot.py`       | Long-poll do Telegram, parse de comandos, streaming de saida |
-| `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 8/21 do mes (com shift quinta+segunda em fim de semana) |
+| `justificativa.py`      | Wrapper diario que dispara `monitor_ponto.py --system st --force-range` em dia 8/21 do mes (com shift quinta+segunda em fim de semana). Com catch-up: disparo perdido e recuperado por até `CATCHUP_MAX_DAYS` |
+| `justificativa_state.json` | Datas de disparo de justificativa ja cumpridas, por sistema; fora do git |
 | `checar_retry.py`       | Wrapper de cron: `--scheduled` roda a checagem e registra retry em caso de falha; `--retry` reexecuta de hora em hora os sistemas pendentes (`--quiet-failure`) |
 | `retry_state.json`      | Estado runtime do retry por sistema (since/attempts/last_error); fora do git |
 | `provisionar_a1.py`     | Caca capacidade ARM A1 na Oracle e auto-migra |
@@ -110,23 +111,23 @@ python telegram_bot.py
 
 ### VM Oracle
 
-As tres checagens semanais rodam via **systemd timer** (nao cron), para nao serem
-perdidas se a VM estiver desligada no horario. As justificativas e o retry horario
-seguem em cron.
+Checagens e justificativas rodam via **systemd timer** (nao cron), para nao serem
+perdidas se a VM estiver desligada no horario. So o retry horario segue em cron.
 
 ```bash
-# checagens semanais: timers com Persistent=true
+# checagens semanais + justificativas: timers com Persistent=true
 sudo cp 'smart-auto-check@.service' 'smart-auto-check@'*.timer /etc/systemd/system/
+sudo cp 'smart-auto-justificativa@.service' 'smart-auto-justificativa@'*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now 'smart-auto-check@st.timer'   # sex 15h (Senior)
 sudo systemctl enable --now 'smart-auto-check@ss.timer'   # sex 21h (Secullum)
 sudo systemctl enable --now 'smart-auto-check@eb.timer'   # seg 06h (MentorH, cobre plantao de domingo)
+sudo systemctl enable --now 'smart-auto-justificativa@st.timer'   # diario 09h
+sudo systemctl enable --now 'smart-auto-justificativa@ss.timer'   # diario 16h
+sudo systemctl enable --now 'smart-auto-justificativa@eb.timer'   # diario 16h
 
-# crontab -e
+# crontab -e  (unica linha restante)
 30 * * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python checar_retry.py --retry >> ~/smart_auto/retry.log 2>&1   # retry horario (min 30): so reexecuta sistemas pendentes
-0 9 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system st   # st: dia 8/21 (shift quinta+segunda se cair fds), range 20 do mes anterior a 20 do mes corrente
-0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system ss   # ss: dia 1, range mes anterior
-0 16 * * * cd /home/ubuntu/smart_auto && /home/ubuntu/venv/bin/python justificativa.py --system eb   # eb: dia 1, range mes anterior
 
 sudo systemctl enable --now smart-auto-bot.service
 sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao migrar
@@ -135,15 +136,23 @@ sudo systemctl enable --now caca-a1.service   # opcional, derruba sozinho ao mig
 sudo cp deploy/52unattended-upgrades-local /etc/apt/apt.conf.d/
 ```
 
-#### Por que timer e nao cron nas checagens
+#### Por que timer e nao cron
 
 Se a VM estiver desligada quando o cron dispara, o job simplesmente nao roda - e o
-`checar_retry.py` **nao** registra retry nesse caso, porque ele so registra quando o
-monitor falha, nao quando nunca foi executado. A checagem semanal seria perdida em
-silencio. Com `Persistent=true`, o systemd grava o ultimo disparo em
-`/var/lib/systemd/timers/stamp-smart-auto-check@<sys>.timer` e executa o job atrasado
-no proximo boot. Verificado em 2026-07-30 retroagindo o stamp em 14 dias: o timer
-disparou imediatamente ao ser reiniciado.
+`checar_retry.py` **nao** cobre isso, porque ele registra falha de execucao
+(exit != 0), nao ausencia de execucao. O job seria perdido em silencio.
+
+Nas **checagens**, `Persistent=true` resolve sozinho: o systemd grava o ultimo
+disparo em `/var/lib/systemd/timers/stamp-smart-auto-check@<sys>.timer` e executa o
+job atrasado no proximo boot. Verificado em 2026-07-30 retroagindo o stamp em 14
+dias: o timer disparou imediatamente ao ser reiniciado.
+
+Nas **justificativas**, o timer sozinho **nao** bastaria: o `justificativa.py` roda
+todo dia e decide internamente se hoje e dia 8/21 (st) ou dia 1 (ss/eb), entao um
+catch-up no dia seguinte cairia no gate "nao e o dia" e nao faria nada. Por isso o
+catch-up e implementado no proprio script, via `justificativa_state.json` (ver
+docstring do modulo): cada data de disparo e um evento, marcado como cumprido so
+apos exit 0, e o range e calculado a partir da data de disparo - nao de hoje.
 
 #### Retry horario (falha de coleta)
 

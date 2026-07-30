@@ -1,0 +1,15 @@
+[Unit]
+Description=smart_auto - notificacao de justificativa (%i)
+Documentation=https://github.com/<usuario>sonrib/smart-auto
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/smart_auto
+ExecStart=/home/ubuntu/venv/bin/python justificativa.py --system %i
+StandardOutput=append:/home/ubuntu/smart_auto/justificativa.log
+StandardError=append:/home/ubuntu/smart_auto/justificativa.log
+TimeoutStartSec=1800
