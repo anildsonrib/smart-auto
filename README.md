@@ -99,6 +99,9 @@ CACA_A1_TELEGRAM_BOT_TOKEN=...  # opcional; se vazio, usa TELEGRAM_BOT_TOKEN
 CACA_A1_TELEGRAM_CHAT_ID=...    # opcional; se vazio, usa TELEGRAM_CHAT_ID
 CALLMEBOT_PHONE=55XXYYYYYYYYY
 CALLMEBOT_APIKEY=...
+OCI_COMPARTMENT_ID=...          # OCID da tenancy/compartment usado no provisionamento
+OCI_SUBNET_ID=...               # OCID da subnet da nova VM
+SMART_AUTO_OLD_VM_IP=...        # opcional; host anterior mostrado na notificação
 ```
 
 ### Execucao local

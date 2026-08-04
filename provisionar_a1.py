@@ -17,19 +17,9 @@ import oci
 import requests
 from pathlib import Path
 
-# ---- config ----
-TARGET_OCPUS   = 4
-TARGET_RAM_GB  = 24
-SHAPE          = "VM.Standard.A1.Flex"
-AD             = "iLGc:SA-SAOPAULO-1-AD-1"
-COMPARTMENT    = "ocid1.tenancy.oc1..REDACTED"
-SUBNET         = "ocid1.subnet.oc1..REDACTED"
-DISPLAY_NAME   = "smart-auto-a1"
-SSH_PUB_FILE   = Path.home() / ".ssh" / "oracle_a1.pub"
-INTERVAL_S     = 60   # 1 min (OCI rate-limit ~10/min em LaunchInstance, 1/min e seguro)
-FAULT_DOMAINS  = ["FAULT-DOMAIN-1", "FAULT-DOMAIN-2", "FAULT-DOMAIN-3"]
-
 ENV = Path(os.environ.get("SMART_AUTO_ENV", "/home/ubuntu/smart_auto/.env"))
+
+
 def env(k):
     if ENV.exists():
         for line in ENV.read_text().splitlines():
@@ -40,6 +30,20 @@ def env(k):
             if key.strip() == k:
                 return value.strip().strip("\"'")
     return os.environ.get(k, "")
+
+
+# ---- config ----
+TARGET_OCPUS   = 4
+TARGET_RAM_GB  = 24
+SHAPE          = "VM.Standard.A1.Flex"
+AD             = "iLGc:SA-SAOPAULO-1-AD-1"
+COMPARTMENT    = env("OCI_COMPARTMENT_ID")
+SUBNET         = env("OCI_SUBNET_ID")
+OLD_VM_IP      = env("SMART_AUTO_OLD_VM_IP")
+DISPLAY_NAME   = "smart-auto-a1"
+SSH_PUB_FILE   = Path.home() / ".ssh" / "oracle_a1.pub"
+INTERVAL_S     = 60   # 1 min (OCI rate-limit ~10/min em LaunchInstance, 1/min e seguro)
+FAULT_DOMAINS  = ["FAULT-DOMAIN-1", "FAULT-DOMAIN-2", "FAULT-DOMAIN-3"]
 
 def env_any(*keys):
     for key in keys:
@@ -151,10 +155,12 @@ def migrar(ip):
        f"A1 (`{ip}`) assumiu como host principal.\n"
        f"Bot ativo, cron sex 15h instalado.\n"
        f"Servico `caca-a1` auto-desativado (nao re-dispara em reboot).\n"
-       f"E2 antiga (`203.0.113.10`) continua RUNNING (sem bot) - voce decide se mantem ou termina depois.\n\n"
+       f"E2 antiga (`{OLD_VM_IP or 'nao configurada'}`) continua RUNNING (sem bot) - voce decide se mantem ou termina depois.\n\n"
        f"SSH A1: `ssh -i ~/.ssh/oracle_a1 ubuntu@{ip}`")
 
 def main():
+    if not COMPARTMENT or not SUBNET:
+        raise RuntimeError("Defina OCI_COMPARTMENT_ID e OCI_SUBNET_ID no ambiente")
     cfg = oci.config.from_file()
     compute = oci.core.ComputeClient(cfg)
     network = oci.core.VirtualNetworkClient(cfg)
