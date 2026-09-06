@@ -12,7 +12,6 @@ Uso (a partir da raiz do projeto):
 <alvo>: @username, id numerico, ou apelido configurado em ALIASES.
 
 Exemplos:
-  python tools/tg.py last caca
   python tools/tg.py read smartauto 10
   python tools/tg.py send smartauto "/status"
 """
@@ -37,8 +36,6 @@ SESSION_FILE = os.path.join(ROOT, ".tg_session.txt")
 
 # apelidos -> entidade real
 ALIASES = {
-    "caca":      "@santi_caca_a1_alert_bot",
-    "caca-a1":   "@santi_caca_a1_alert_bot",
     "smartauto": "@santi_smartauto_bot",
     "bot":       "@santi_smartauto_bot",
     "trader":    "@santi_trader_sim_bot",

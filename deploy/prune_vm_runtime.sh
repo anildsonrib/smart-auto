@@ -45,7 +45,7 @@ build_find() {
 }
 
 echo "=== servicos (validacao pre-prune) ==="
-systemctl is-active smart-auto-bot caca-a1 caca-a1-bot 2>/dev/null || true
+systemctl is-active smart-auto-bot 2>/dev/null || true
 echo ""
 
 echo "=== alvos (lista fechada) ==="
@@ -70,7 +70,7 @@ if [ "$MODE" = "apply" ]; then
     -type d -name '__pycache__' -print -exec rm -rf {} +
   echo ""
   echo "=== servicos (validacao pos-prune) ==="
-  systemctl is-active smart-auto-bot caca-a1 caca-a1-bot 2>/dev/null || true
+  systemctl is-active smart-auto-bot 2>/dev/null || true
 else
   echo "[dry-run] nada removido. Rode com --apply para remover os alvos acima."
 fi

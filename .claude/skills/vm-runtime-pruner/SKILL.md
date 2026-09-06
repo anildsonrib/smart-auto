@@ -1,6 +1,6 @@
 ---
 name: vm-runtime-pruner
-description: Use when slimming the Oracle VM deployment for smart_auto so the server keeps only runtime files required to run the ponto monitor, Telegram bot, justificativa wrapper, and A1 hunter, while docs, skills, tests, local artifacts, and other accessories remain local. Includes guardrails for secrets, state files, systemd services, safe remote pruning, and post-prune health validation.
+description: Use when slimming the Oracle VM deployment for smart_auto so the server keeps only runtime files required to run the ponto monitor, Telegram bot, and justificativa wrapper, while docs, skills, tests, local artifacts, and other accessories remain local. Includes guardrails for secrets, state files, systemd services, safe remote pruning, and post-prune health validation.
 ---
 
 # VM Runtime Pruner
@@ -16,10 +16,7 @@ o `smart_auto` em producao 24/7.
 - Pasta na VM: `/home/ubuntu/smart_auto`
 - Servicos:
   - `smart-auto-bot.service`
-  - `caca-a1.service` quando o hunter estiver ativo
-  - `caca-a1-bot.service` quando existir o bot de apoio
 - Telegram principal: o bot configurado em `.env`
-- Telegram do hunter A1: opcional via `CACA_A1_TELEGRAM_BOT_TOKEN` e `CACA_A1_TELEGRAM_CHAT_ID`
 
 ## Objetivo
 
@@ -40,11 +37,7 @@ Separar claramente:
 - `folha_ponto.py`
 - `folha_secullum.py`
 - `folha_mentorh.py`
-- `provisionar_a1.py`
-- `caca_a1_bot.py`
 - `smart-auto-bot.service`
-- `caca-a1.service`
-- `caca-a1-bot.service`
 - `monitor_state.json`
 - `cache/`
 - `*.log` relacionados a execucao da VM, se usados como runtime
@@ -89,7 +82,7 @@ Se houver duvida entre runtime e apoio local, preservar.
 
 ```bash
 ssh -i ~/.ssh/oracle_smart_auto ubuntu@203.0.113.10 \
-  "cd /home/ubuntu/smart_auto && systemctl is-active smart-auto-bot caca-a1 caca-a1-bot 2>/dev/null || true"
+  "cd /home/ubuntu/smart_auto && systemctl is-active smart-auto-bot 2>/dev/null || true"
 ```
 
 2. Usar o script local de prune `deploy/prune_vm_runtime.sh` (dry-run e o modo padrao;
@@ -109,7 +102,7 @@ bash deploy/prune_vm_runtime.sh --apply
 
 ```bash
 ssh -i ~/.ssh/oracle_smart_auto ubuntu@203.0.113.10 \
-  "cd /home/ubuntu/smart_auto && systemctl is-active smart-auto-bot caca-a1 caca-a1-bot 2>/dev/null || true"
+  "cd /home/ubuntu/smart_auto && systemctl is-active smart-auto-bot 2>/dev/null || true"
 ```
 
 5. Testar Telegram sem celular, se o bot e a CLI local estiverem disponiveis:

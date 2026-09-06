@@ -31,26 +31,6 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 - **Saida**: mensagens incrementais com markers convertidos em texto humano.
 - **Erros**: `friendly_error()` traduz traceback em mensagens claras (HTTP 5xx, 401/403, 404, timeout, DNS, conexao recusada, SSL, login invalido, PDF vazio). Fallback exibe so `Tipo: msg` em uma linha.
 
-## 3. Hunter A1 (`provisionar_a1.py` via `caca-a1.service`)
-
-> **DESLIGADO desde 2026-07-30 por decisao do usuario.** `caca-a1` e `caca-a1-bot`
-> estao `stop` + `disable` (nao voltam em reboot). Unit files e codigo preservados.
-> Para religar: `sudo systemctl enable --now caca-a1 caca-a1-bot`.
-> Motivo: meses de polling sem conseguir capacidade A1, consumindo CPU numa VM de
-> 1 OCPU compartilhada. O restante desta secao descreve o comportamento quando ativo.
-
-- **Gatilho**: systemd, loop interno a cada `INTERVAL_S = 300`.
-- **Funcao**: tentar `LaunchInstance` na Oracle com shape `VM.Standard.A1.Flex` (4 OCPU + 24 GB hardcoded).
-- **Pre-check**: se ja existe instancia A1 ativa, aborta para evitar duplicacao.
-- **Pos-sucesso**:
-  1. aguarda SSH na nova VM
-  2. instala deps + copia arquivos
-  3. instala `smart-auto-bot.service` + crontab
-  4. para o bot na VM E2 (evita duplo polling)
-  5. `systemctl disable caca-a1` (self-shutdown)
-- **Notificacao**: Telegram apenas em sucesso ou erro inesperado. Usa `CACA_A1_TELEGRAM_BOT_TOKEN`/`CACA_A1_TELEGRAM_CHAT_ID` quando configurados; caso contrario, usa o bot principal. Tentativas "out of capacity" sao silenciosas.
-- **Custo**: zero - shape sempre dentro do Always Free; `Restart=no` impede loop infinito apos sucesso.
-
 ## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
 
 - **Gatilhos**: 3 systemd timers diarios (`smart-auto-justificativa@<sys>.timer`, `Persistent=true`).

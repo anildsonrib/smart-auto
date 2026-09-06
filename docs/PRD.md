@@ -88,14 +88,6 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - Primeira execucao (sem state) absorve o historico anterior a janela em silencio, sem notificar retroativamente.
 - Motivo de a logica viver no script e nao no timer: `Persistent=true` recuperaria a execucao, mas o gate interno de dia do mes rejeitaria o catch-up ("hoje nao e dia 8"), tornando a recuperacao inocua.
 
-### 4.6 Caca A1 (opcional)
-
-- Polling a cada 5 min na Oracle por capacidade ARM `VM.Standard.A1.Flex` (4 OCPU + 24 GB)
-- Notifica Telegram somente em sucesso ou erro inesperado (nao a cada tentativa)
-- Pode usar bot Telegram proprio via `CACA_A1_TELEGRAM_BOT_TOKEN` e `CACA_A1_TELEGRAM_CHAT_ID`; se ausentes, usa o bot principal.
-- Auto-migra arquivos + systemd + cron pra nova VM
-- Auto-desabilita servico apos sucesso (`systemctl disable caca-a1`)
-
 ## 5. Requisitos nao-funcionais
 
 | Categoria       | Requisito |
@@ -104,7 +96,7 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 | Disponibilidade | Bot deve sobreviver a reboot (Restart=on-failure). |
 | Performance     | Cache de PDF (10 min) para evitar redownloads em comandos sequenciais. |
 | Privacidade     | `.env` fora do git. Sessoes persistentes apenas locais (`active-sessions/`). |
-| Observabilidade | Logs em `bot.log` e `caca_a1.log` na VM. |
+| Observabilidade | Logs em `bot.log` na VM. |
 
 ## 6. Fora de escopo
 

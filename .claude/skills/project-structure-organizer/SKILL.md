@@ -14,7 +14,7 @@ explicita**.
 - Projeto local: `C:\Users\<usuario>\Documents\smart_auto`
 - Projeto Python com scripts soltos na raiz, skills locais em `.claude/skills/`, e fluxo de
   runtime centrado em `monitor_ponto.py`, `telegram_bot.py`, `justificativa.py` e
-  `provisionar_a1.py`.
+  os scripts auxiliares.
 - O bot roda 24/7 na VM Oracle usando systemd, cron e arquivos de estado como
   `monitor_state.json`.
 - `active-sessions/` pode conter atalhos de trabalho local e deve ser tratado com cuidado.
@@ -85,11 +85,9 @@ smart_auto/
   monitor_ponto.py        # orquestrador principal de ponto
   telegram_bot.py         # bot de Telegram do ponto
   justificativa.py        # wrapper de justificativa por sistema
-  provisionar_a1.py       # hunter A1
   folha_ponto.py          # downloader Senior
   folha_secullum.py       # downloader Secullum
   folha_mentorh.py       # downloader MentorH
-  caca_a1_bot.py          # bot auxiliar do hunter A1
   *.service               # units systemd na raiz quando o deploy espera isso
   monitor_state.json      # estado de deduplicacao
   docs/                   # documentacao (ex.: docs/PRD.md)

@@ -22,9 +22,6 @@ midia/
 waapi_apk/
 folha_ponto_*.pdf
 folha_ponto_*.html
-oracle_*.png
-oracle_dump.html
-oracle_snap.png
 tg*.png
 
 # cache local de downloads

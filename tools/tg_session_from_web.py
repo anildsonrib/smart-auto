@@ -1,5 +1,5 @@
 """Converte a auth key MTProto do Telegram Web (webk localStorage) numa
-StringSession do Telethon, sem precisar de OTP. Testa lendo o chat do caca-a1."""
+StringSession do Telethon, sem precisar de OTP. Testa lendo o chat do bot de ponto."""
 import json, asyncio, sys
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -51,9 +51,9 @@ async def main():
         f.write(sess_str)
     print("SESSION_SAVED")
 
-    # Le ultimas mensagens do bot do caca-a1
-    msgs = await client.get_messages("@santi_caca_a1_alert_bot", limit=5)
-    print("\n=== Ultimas mensagens caca-a1 ===")
+    # Le ultimas mensagens do bot de ponto
+    msgs = await client.get_messages("@santi_smartauto_bot", limit=5)
+    print("\n=== Ultimas mensagens do bot de ponto ===")
     for m in reversed(msgs):
         print(f"[{m.date:%Y-%m-%d %H:%M:%S}] {m.text}")
 

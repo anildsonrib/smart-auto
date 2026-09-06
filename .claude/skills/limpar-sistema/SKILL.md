@@ -13,9 +13,8 @@ description: Remove artefatos efemeros do projeto smart_auto (PDFs baixados, scr
 | `folha_ponto_*.html`           | cache HTML legado                       |
 | `cache/`                       | JSON cache (st/ss/eb), TTL 600s         |
 | `tg*.png`                      | screenshots do celular via adb          |
-| `oracle_*.png`, `oracle_*.html`, `oracle_snap.png`, `oracle_dump.html` | debug do hunter A1 |
 | `*.pyc`, `__pycache__/`        | bytecode Python                         |
-| `*.log`                        | bot.log, caca_a1.log locais             |
+| `*.log`                        | bot.log local                           |
 | `tmp/`                         | temporarios                             |
 | `captures/`, `midia/`, `waapi_apk/` | artefatos antigos de exploração     |
 
