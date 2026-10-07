@@ -24,7 +24,7 @@ Filtrar `chat.id != TELEGRAM_CHAT_ID` antes de qualquer acao.
 
 | Comando | Args | Acao |
 |---------|------|------|
-| `/checar`  | `<st\|ss>`                  | `monitor_ponto.py --system X` |
+| `/checar`  | `<st\|ss\|eb>`               | `monitor_ponto.py --system X` - **rejeita** argumentos de data (sugere `/forcar`); datas so em `/forcar` |
 | `/forcar`  | `<data\|range> <st\|ss>`    | `--force-day` ou `--force-range` |
 | `/status`  | `<st\|ss>`                  | le `monitor_state.json[X]` |
 | `/resetar` | `<st\|ss>`                  | apaga `monitor_state.json[X]` |

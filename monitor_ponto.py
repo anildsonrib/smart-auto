@@ -43,18 +43,25 @@ SYSTEMS = {
         "expected":  ["07:00", "10:00", "10:15", "13:00"],
         "weekdays":  {0, 1, 2, 3},
         "downloader": "senior",
+        "min_interval_minutes": 15,
+        "feriado_folga": True,
+        "ciclo": "rh20",      # competencia do RH Senior: dia 21 ao dia 20
     },
     "ss": {  # Sesa - Secullum Ponto 4
         "id": "Sesa",
         "expected":  ["14:00", "20:00"],
         "weekdays":  {0, 1, 2, 3},
         "downloader": "secullum",
+        "feriado_folga": True,
+        "ciclo": "mes",       # competencia mensal civil
     },
     "eb": {  # MentorH (SIGP EBSERH) - escala de plantao 12x36
         "id": "MentorH",
         "expected":  ["07:00", "19:00"],
         "weekdays":  {0, 1, 2, 3, 4, 5, 6},   # qualquer dia pode ser de plantao
         "downloader": "mentorh",
+        # sem feriado_folga: plantonista trabalha em feriado normalmente
+        "ciclo": "mes",       # competencia mensal civil
     },
 }
 DEFAULT_SYSTEM = "st"
@@ -222,6 +229,21 @@ def extras_no_dia(punches, expected):
     cobertos = _alinhar(expected, punches)
     return [punches[i] for i in range(len(punches)) if i not in cobertos]
 
+def intervalos_menores_que(punches, minimo_minutos: int):
+    """Retorna intervalos consecutivos menores que `minimo_minutos`.
+
+    Cada item e (hora_anterior, hora_posterior, delta_minutos).
+    """
+    if len(punches) < 2:
+        return []
+    ordenadas = sorted(punches, key=_hhmm_to_min)
+    anomalias = []
+    for anterior, atual in zip(ordenadas, ordenadas[1:]):
+        delta = _hhmm_to_min(atual) - _hhmm_to_min(anterior)
+        if delta < minimo_minutos:
+            anomalias.append((anterior, atual, delta))
+    return anomalias
+
 def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
                  force_day: date | None = None,
                  force_range: tuple[date, date] | None = None,
@@ -230,6 +252,7 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
     pendencias = []
     expected = sys_cfg["expected"]
     weekdays = sys_cfg["weekdays"]
+    min_interval = sys_cfg.get("min_interval_minutes")
     hoje = agora.date()
     for d in dias:
         # Override per-day (ex: MentorH escala variavel - dia/noite/folga)
@@ -279,13 +302,15 @@ def avaliar_dias(dias, agora: datetime, sys_cfg: dict,
         # (em --force no dia corrente, expected_eff pode estar filtrado por grace).
         partial = len(expected_eff) < len(expected_full)
         extras = [] if partial else extras_no_dia(punches_eff, expected_full)
-        if faltando or extras:
+        intervalos = intervalos_menores_que(punches_eff, min_interval) if min_interval else []
+        if faltando or extras or intervalos:
             pendencias.append({
                 "date":      d["date"],
                 "weekday":   d["weekday"],
                 "punches":   punches_eff,
                 "faltando":  faltando,
                 "extras":    extras,
+                "intervalos": intervalos,
                 "motivo":    d.get("motivo", ""),
             })
     return pendencias
@@ -313,15 +338,36 @@ def _send_telegram(env, message: str) -> bool:
         print(f"[telegram] fallback falhou: {_erro_curto(e)}")
         return False
 
+def _motivo_falha_whatsapp(texto: str) -> str:
+    """Traduz o corpo do CallMeBot num motivo curto para o usuario.
+
+    O provedor devolve HTTP 208 com um <h2> explicando o bloqueio; sem isso o
+    usuario so descobriria o canal fora lendo o log da VM.
+    """
+    low = (texto or "").lower()
+    if "paused" in low:
+        return "conta CallMeBot pausada"
+    if "not registered" in low or "apikey" in low:
+        return "credenciais CallMeBot invalidas"
+    if not texto:
+        return "sem resposta do CallMeBot"
+    return "CallMeBot recusou o envio"
+
+
 def send_whatsapp(env, message: str, skip: bool = False):
     if skip:
         print("[whatsapp] skip (--no-whatsapp)")
         return True
+    # Permite desligar o canal sem editar codigo nem passar flag em todo cron.
+    if env.get("WHATSAPP_ENABLED", "").strip().lower() in ("0", "false", "no", "off"):
+        print("[whatsapp] desabilitado por WHATSAPP_ENABLED; enviando so no Telegram.")
+        return _send_telegram(env, message)
     phone  = env.get("CALLMEBOT_PHONE", "").strip()
     apikey = env.get("CALLMEBOT_APIKEY", "").strip()
     if not phone or not apikey:
         print("[whatsapp] CALLMEBOT_PHONE/APIKEY nao configurados, pulando envio.")
         return False
+    motivo = ""
     try:
         r = requests.get(
             "https://api.callmebot.com/whatsapp.php",
@@ -334,12 +380,18 @@ def send_whatsapp(env, message: str, skip: bool = False):
         # (tudo apos o ultimo <p>) para nao truncar a parte que importa.
         verdict = r.text.rsplit("<p>", 1)[-1].strip()[:200]
         print(f"[whatsapp] status={r.status_code} ok={ok} verdict={verdict}")
+        if not ok:
+            motivo = _motivo_falha_whatsapp(r.text)
     except requests.RequestException as e:
         ok = False
+        motivo = "rede indisponivel"
         print(f"[whatsapp] falhou: {_erro_curto(e)}")
     if not ok:
         print("[whatsapp] envio falhou; tentando fallback via Telegram.")
-        return _send_telegram(env, message)
+        # O aviso vai junto da mensagem para o canal degradado ficar visivel ao
+        # usuario, nao so no log da VM.
+        aviso = f"\n\n⚠️ _WhatsApp nao entregue ({motivo}); enviado so aqui._"
+        return _send_telegram(env, message + aviso)
     return ok
 
 def _erro_curto(exc: BaseException) -> str:
@@ -426,25 +478,72 @@ def _has_absence(raw_cells, tokens=_ABSENCE_TOKENS):
             return True
     return False
 
+
+def periodo_sistema(cfg: dict, hoje: date) -> tuple[date, date]:
+    """Janela avaliada pela checagem normal, conforme o ciclo do sistema.
+
+    - "mes" (default): mes civil corrente.
+    - "rh20": competencia do RH Senior, dia 21 ao dia 20 do mes seguinte.
+
+    Usar mes civil no `st` fazia pendencia real sumir do radar antes do prazo:
+    em 07/10/2026 o dia 23/09 ja estava fora da janela, embora o ciclo so
+    fechasse em 20/10 e a correcao ainda fosse possivel.
+    """
+    from calendar import monthrange
+    if cfg.get("ciclo") == "rh20":
+        if hoje.day <= 20:
+            fim = hoje.replace(day=20)
+            ini = (hoje.replace(day=1) - timedelta(days=1)).replace(day=21)
+        else:
+            ini = hoje.replace(day=21)
+            fim = (hoje.replace(day=28) + timedelta(days=7)).replace(day=20)
+        return ini, fim
+    return hoje.replace(day=1), hoje.replace(day=monthrange(hoje.year, hoje.month)[1])
+
+
+def _feriado(cfg: dict, d: date) -> str | None:
+    """Nome do feriado se o sistema folga em feriado, senao None.
+
+    Fonte propria (calendario), nao a folha: o Secullum nao marca feriado nas
+    celulas, entao depender da folha gerava falso positivo (ex.: 07/09/2026).
+    Plantonista (eb) nao tem `feriado_folga` e passa direto por aqui.
+    """
+    if not cfg.get("feriado_folga"):
+        return None
+    import feriados
+    return feriados.eh_feriado(d)
+
 def baixar_dias(sys_key: str, ini: date, fim: date) -> list[dict]:
     """Retorna list[{date, weekday(UPPER 3), punches[], is_workday}] normalizado."""
     cfg = SYSTEMS[sys_key]
     if cfg["downloader"] == "senior":
         pdf_path = baixar_pdf_periodo(ini, fim)
         print(f"[pdf] {pdf_path}")
-        return parse_pdf(pdf_path, ini, fim, expected_count=len(cfg["expected"]))
+        dias = parse_pdf(pdf_path, ini, fim, expected_count=len(cfg["expected"]))
+        # Redundante na pratica (o Senior ja traz hor != 0260 em feriado), mas
+        # serve de rede de seguranca se a folha vier com a escala normal no dia.
+        for d in dias:
+            feriado = _feriado(cfg, d["date"])
+            if feriado:
+                d["is_workday"] = False
+                d["motivo"] = f"Feriado: {feriado}" + (f" | {d['motivo']}" if d.get("motivo") else "")
+        return dias
     elif cfg["downloader"] == "secullum":
         import folha_secullum
         raw = folha_secullum.baixar(ini, fim)
         dias = []
         for d in raw:
             absent = _has_absence(d.get("raw", []))
+            feriado = _feriado(cfg, d["date"])
+            motivo = " ".join(c for c in d.get("raw", []) if c and not re.match(r"^\d{2}:\d{2}", c.strip())).strip()
+            if feriado:
+                motivo = f"Feriado: {feriado}" + (f" | {motivo}" if motivo else "")
             dias.append({
                 "date":       d["date"],
                 "weekday":    (d.get("weekday") or "")[:3].upper(),
                 "punches":    d.get("marcacoes", []),
-                "is_workday": d["date"].weekday() in cfg["weekdays"] and not absent,
-                "motivo":     " ".join(c for c in d.get("raw", []) if c and not re.match(r"^\d{2}:\d{2}", c.strip())).strip(),
+                "is_workday": d["date"].weekday() in cfg["weekdays"] and not absent and not feriado,
+                "motivo":     motivo,
             })
         return dias
     elif cfg["downloader"] == "mentorh":
@@ -528,9 +627,7 @@ def main():
         from calendar import monthrange
         per_fim = force_day.replace(day=monthrange(force_day.year, force_day.month)[1])
     else:
-        from calendar import monthrange
-        per_ini = today.replace(day=1)
-        per_fim = today.replace(day=monthrange(today.year, today.month)[1])
+        per_ini, per_fim = periodo_sistema(sys_cfg, today)
 
     # 2. Download + normaliza (sistema-aware)
     try:
@@ -586,6 +683,11 @@ def main():
         if p.get("extras"):
             extras_lst = "\n".join(f"   {h}" for h in p["extras"])
             secoes.append(f"_Marcacoes extras:_\n{extras_lst}")
+        if p.get("intervalos"):
+            intervalos_lst = "\n".join(
+                f"   {a} -> {b} ({delta} min)" for a, b, delta in p["intervalos"]
+            )
+            secoes.append(f"_Marcações inválidas (<{sys_cfg['min_interval_minutes']} min):_\n{intervalos_lst}")
         secoes.append(f"_Marcadas:_\n{marcadas_lst}")
         return "\n\n".join(secoes) + rodape
 

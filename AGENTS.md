@@ -5,11 +5,12 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 ## 1. Cron Monitor (`monitor_ponto.py --system <st|ss|eb>`)
 
 - **Gatilho**: systemd timer na VM Oracle (`smart-auto-check@<sys>.timer`, `Persistent=true`), via wrapper `checar_retry.py --scheduled`. `sex 15h` (st), `sex 21h` (ss), `seg 06h` (eb). Nao e cron: se a VM estiver desligada no horario, o timer recupera a execucao no proximo boot. Justificativas (`diario 09h` st, `diario 16h` ss/eb) seguem em cron e chamam `justificativa.py` direto - **essas ainda sao perdidas se a VM estiver desligada no horario**.
-- **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao WhatsApp quando houver pendencias vencidas, mesmo se ja notificadas em execucao anterior.
+- **Funcao**: rodar avaliacao do periodo corrente e disparar notificacao (Telegram) quando houver pendencias vencidas, mesmo se ja notificadas em execucao anterior.
 - **Estado**: le/escreve `monitor_state.json[sys_key]`.
 - **Entrada externa**: PDF Senior ou HTML Secullum.
-- **Saida externa**: CallMeBot HTTP + Telegram sendMessage.
-- **Falha aceitavel**: timeout/login erro -> log + alerta WhatsApp de falha; nao marca como notificado. O wrapper registra retry pendente (ver agente 1.5).
+- **Janela avaliada**: `periodo_sistema(cfg, hoje)`, conforme a chave `ciclo` em `SYSTEMS`. `st` usa `"rh20"` (dia 21 ao dia 20, competencia do RH Senior); `ss` e `eb` usam `"mes"` (mes civil). Mes civil no `st` fazia pendencia real sumir do radar antes do prazo - em 07/10/2026 o dia 23/09 ja estava fora da janela, com o ciclo fechando so em 20/10.
+- **Saida externa**: **Telegram sendMessage** (canal unico desde 07/10/2026). O WhatsApp/CallMeBot foi desligado por opcao do usuario via `WHATSAPP_ENABLED=false` no `.env`: nenhuma tentativa e feita e nenhum aviso e adicionado a mensagem. Se o canal for reativado (`WHATSAPP_ENABLED=true`) e o CallMeBot falhar, o fallback por Telegram leva junto um aviso (`WhatsApp nao entregue (<motivo>)`), para a degradacao nao ficar visivel so no log da VM.
+- **Falha aceitavel**: timeout/login erro -> log + alerta de falha no canal ativo; nao marca como notificado. O wrapper registra retry pendente (ver agente 1.5).
 
 ## 1.5 Retry de coleta (`checar_retry.py --scheduled|--retry`)
 
@@ -18,7 +19,7 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 - **Funcao**: tornar a checagem resiliente a indisponibilidade do sistema de ponto. `--scheduled` roda o monitor (`--no-state`) e, se falhar (exit != 0), registra o sistema em `retry_state.json`. `--retry` reexecuta de hora em hora apenas os sistemas pendentes (`--no-state --quiet-failure`).
 - **Independencia**: por sistema (`st`, `ss`, `eb`) - cada um retenta isolado.
 - **Estado**: le/escreve `retry_state.json` (since/attempts/last_error), runtime, fora do git. Escrita atomica + lock local.
-- **Saida externa**: nenhuma propria; delega ao monitor. Retentativas sao silenciosas (sem WhatsApp de falha); a 1a falha agendada ja alertou.
+- **Saida externa**: nenhuma propria; delega ao monitor. Retentativas sao silenciosas (sem alerta de falha); a 1a falha agendada ja alertou.
 - **Parada**: sucesso (exit 0) limpa a entrada; teto `RETRY_MAX_HOURS = 24` descarta entradas antigas sem novo envio. Sem loop interno - 1 tentativa por execucao.
 - **Log**: `retry.log` na VM, runtime, fora do git.
 
@@ -29,19 +30,20 @@ Mapa dos componentes autonomos do sistema. Cada "agente" e um processo independe
 - **Restricao**: ignora mensagens fora do `TELEGRAM_CHAT_ID` configurado.
 - **Modo de parse**: HTML (workaround do bug do Markdown legado que comia primeira linha bold-only).
 - **Saida**: mensagens incrementais com markers convertidos em texto humano.
+- **Argumentos**: comandos que nao aceitam data (`/checar`, `/status`, `/resetar`) **rejeitam** argumentos nao consumidos via `erro_args_extras()`, sugerindo o `/forcar` equivalente. Antes o descarte era silencioso: em 07/10/2026 quatro tentativas de `/checar st <data>` responderam "Tudo certo" sobre o mes corrente sem olhar a data pedida, gerando diagnostico errado. Falha silenciosa com resposta positiva e pior que erro.
 - **Erros**: `friendly_error()` traduz traceback em mensagens claras (HTTP 5xx, 401/403, 404, timeout, DNS, conexao recusada, SSL, login invalido, PDF vazio). Fallback exibe so `Tipo: msg` em uma linha.
 
 ## 3.5 Wrapper de justificativa (`justificativa.py --system <st|ss|eb>`)
 
 - **Gatilhos**: 3 systemd timers diarios (`smart-auto-justificativa@<sys>.timer`, `Persistent=true`).
-  - `0 9 * * * --system st`: justificativa Santi RH (manual, exige presenca). Dias 8 e 21; weekend shift = quinta+segunda. Range: dia 20 do mes anterior ao dia 20 do mes corrente (ciclo do RH; futuras ignoradas).
+  - `diario 09h --system st`: justificativa Santi RH (manual, exige presenca). Dias 7 e 20; weekend shift = quinta+segunda. **Sao duas entregas ao RH sobre o mesmo ciclo, com cortes diferentes**: disparo do dia 7 avalia 21 do mes anterior a **dia 6**; disparo do dia 20 avalia 21 do mes anterior a **dia 20**. O corte segue o DIA-ALVO da regra (`janela_fim`), nao a data do disparo, que o weekend shift pode deslocar. Futuras ignoradas.
   - `0 16 * * * --system ss`: justificativa Sesa (online). Dia 1 sem shift. Range: mes anterior.
   - `0 16 * * * --system eb`: justificativa MentorH (online). Dia 1 sem shift. Range: mes anterior.
 - **Regras**: definidas no dict `RULES` (days, weekend_shift, periodo, subtitulo) dentro de `justificativa.py`.
 - **Acao**: chama `monitor_ponto.py --system <sys> --force-range INI FIM --subtitulo "..."`. `--force-range` bypassa dedup mas preserva carencia de 4h e deteccao de motivo na folha. Sem pendencia => nenhuma mensagem enviada.
 - **Catch-up**: cada data de disparo e um evento registrado em `justificativa_state.json` (`{"st": {"despachados": [...]}}`, runtime, fora do git) e marcado como cumprido **so apos exit 0**. Disparo perdido (VM desligada) ou falho e retentado por ate `CATCHUP_MAX_DAYS = 5`; depois disso e descartado com log. O range e derivado da **data de disparo**, nao de hoje - senao um catch-up avaliaria o ciclo errado. Disparos que geram o mesmo range sao coalescidos em um envio. Primeira execucao sem state absorve o historico em silencio (`[init]`).
 - **Teste**: `--dry-run` mostra o plano sem chamar o monitor nem gravar state; `--hoje YYYY-MM-DD` simula outra data.
-- **Saida**: WhatsApp via CallMeBot (monitor_ponto nao envia Telegram em modo cron).
+- **Saida**: Telegram (canal unico; o WhatsApp esta desligado via `WHATSAPP_ENABLED=false`).
 - **Log**: `/home/ubuntu/smart_auto/justificativa.log`.
 
 ## 4. Downloaders
@@ -82,6 +84,37 @@ Parse via regex de `<tr>`/`<td>`. Detecta turno por dia (diurno sex/dom vs notur
 Quando um dia tem 0 marcacoes, o dispatcher inspeciona o texto bruto da linha (ocorrencia/obs) e:
 - Marca `is_workday=False` se casar com `_ABSENCE_TOKENS` (FERIAS, ABO, ABONO, FALTA, FOLGA, FERIADO, DSR, ATESTADO) - vale pros 3 downloaders.
 - Propaga o texto via campo `motivo`. A mensagem final do bot mostra `_Motivo na folha:_` quando o dia ficou pendente mesmo com 0 marcacoes e ha texto bruto - util pra casos onde o motivo nao casa com token (ex: "Coleta nao realizada", "Compensacao XYZ").
+
+### 4.45 Feriados (`feriados.py`)
+
+Calendario proprio, **independente da folha**: sistema de ponto nao e fonte
+confiavel de feriado. Verificado em 07/09/2026 (Independencia, segunda-feira):
+a linha do Secullum trazia apenas `'07/09/26 - seg'`, sem nenhum token, e o dia
+era cobrado como falta.
+
+Cadeia de resolucao, nesta ordem:
+1. `feriados_extra.json` (raiz, fora do git) - estaduais/municipais, declarados
+   a mao. Tem precedencia: e conhecimento local que API nacional nao tem.
+   Formato `{"2026-10-24": "Aniversario da cidade"}`.
+2. BrasilAPI `https://brasilapi.com.br/api/feriados/v1/<ano>` - nacionais.
+   Resposta fica em `feriados_cache.json` (fora do git), revalidada a cada
+   `CACHE_MAX_DAYS = 90`.
+3. Calculo local - fixos + moveis derivados da Pascoa (Meeus/Jones/Butcher).
+   Fallback obrigatorio: o monitor roda por timer sem ninguem olhando, e falha
+   de rede nao pode virar falso positivo de falta. Cache vencido e preferido ao
+   calculo quando a API esta fora.
+
+Conferido contra a API em 2024-2028: o calculo local bate em todos (a unica
+diferenca e o domingo de Pascoa, que a API lista e nao e dia util).
+
+**Opt-in por sistema**, via `feriado_folga: True` no dict `SYSTEMS`:
+- `st` e `ss`: diarista, feriado e folga.
+- `eb`: **sem** a flag - plantonista trabalha feriado normalmente.
+
+Em `st` a camada e redundante (a folha Senior ja traz `hor != "0260"` e o texto
+"Feriado" no dia); fica como rede de seguranca caso a escala venha normal.
+Quando aplica, o dia vira `is_workday=False` e o campo `motivo` recebe
+`Feriado: <nome>`.
 
 ### 4.5 Cache uniforme
 

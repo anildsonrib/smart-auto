@@ -13,6 +13,8 @@ retry_state.json
 .retry_state.lock
 justificativa_state.json
 .justificativa_state.lock
+feriados_cache.json
+feriados_extra.json
 __pycache__/
 *.pyc
 

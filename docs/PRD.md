@@ -6,7 +6,7 @@ Funcionarios precisam acompanhar suas marcacoes de ponto em multiplos sistemas (
 
 ## 2. Objetivo
 
-Automatizar a deteccao de marcacoes faltantes e entregar notificacao pro-ativa em canais convenientes (Telegram, WhatsApp), com possibilidade de checagem on-demand e cobertura de janelas customizadas.
+Automatizar a deteccao de marcacoes faltantes e entregar notificacao pro-ativa por Telegram, com possibilidade de checagem on-demand e cobertura de janelas customizadas. O canal WhatsApp (CallMeBot) existe no codigo mas esta desligado por opcao do usuario desde 07/10/2026 (`WHATSAPP_ENABLED=false`).
 
 ## 3. Usuario alvo
 
@@ -41,7 +41,7 @@ Profissional unico (uso pessoal), bilingue PT-BR, opera Windows + VM Linux, valo
 ### 4.3 Notificacao
 
 - Telegram (HTML parse mode) - canal interativo
-- CallMeBot WhatsApp - apenas envio do cron
+- CallMeBot WhatsApp - desligado por opcao do usuario (`WHATSAPP_ENABLED=false`); reativavel pelo `.env`
 - Cabecalho com identificador do sistema (`SANTI` / `Sesa`)
 - Quando 0 pendencias: mensagem amigavel "Ponto OK"
 
@@ -63,30 +63,30 @@ Erros do sistema de ponto sao traduzidos em mensagens amigaveis por `friendly_er
 - As 3 checagens usam systemd timer com `Persistent=true`, nao cron: execucao perdida por VM desligada e recuperada no proximo boot. As 3 justificativas tambem usam timer, mas o catch-up delas exige logica propria (ver 4.5.2). Somente o retry horario permanece em cron.
 - Reboot automatico de kernel habilitado via `unattended-upgrades` as 04:15 (`deploy/52unattended-upgrades-local`), horario escolhido por nao colidir com nenhum timer ou cron da VM compartilhada.
 - `horario min 30`: `checar_retry.py --retry` reexecuta de hora em hora apenas os sistemas pendentes.
-- `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 8 e 21 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: ciclo do RH (dia 20 do mes anterior ao dia 20 do mes corrente; datas futuras ignoradas).
+- `diario 09h --system st`: justificativa Santi/Senior (manual no RH, exige presenca). Dispara em dia 7 e 20 do mes; se a data cair em sex/sab/dom, antecipa pra quinta anterior E adia pra segunda seguinte (2 notificacoes). Range: duas entregas sobre o mesmo ciclo, com cortes diferentes - disparo do dia 7 avalia 21 do mes anterior a dia 6; disparo do dia 20 avalia 21 do mes anterior a dia 20. O corte deriva do dia-alvo (`janela_fim`), nao da data do disparo. Datas futuras ignoradas.
 - `diario 16h --system ss` e `--system eb`: justificativa Sesa e MentorH (online, qualquer dia/hora vale). Dispara somente em dia 1 do mes, sem shift. Range: mes anterior fechado.
 - Em todos os casos: `justificativa.py` chama `monitor_ponto.py --force-range`, respeita carencia de 4h, motivo na folha (atestado/abono/etc) e so envia se houver pendencia real.
-- Notificacao de cron via WhatsApp; falha de download/login tambem gera alerta WhatsApp quando possivel.
+- Notificacao de cron via Telegram; falha de download/login tambem gera alerta pelo mesmo canal.
 
 ### 4.5.1 Retry horario de falha de coleta
 
 - `checar_retry.py --scheduled --system <st|ss|eb>` envolve a checagem semanal: exit 0 limpa o retry pendente do sistema; exit != 0 registra/atualiza `retry_state.json` so para aquele sistema.
 - `checar_retry.py --retry` (cron `30 * * * *`) le `retry_state.json` e reexecuta o monitor (`--no-state --quiet-failure`) para cada sistema pendente. Sucesso limpa a entrada e envia a pendencia se houver; falha incrementa `attempts` em silencio.
 - Independente por sistema: `st`, `ss` e `eb` retentam isoladamente.
-- Primeira falha agendada mantem o alerta WhatsApp de falha; retentativas horarias sao silenciosas (`--quiet-failure`).
+- Primeira falha agendada mantem o alerta de falha (Telegram); retentativas horarias sao silenciosas (`--quiet-failure`).
 - Teto `RETRY_MAX_HOURS = 24`: entradas mais antigas sao descartadas sem novo envio.
 - Sem loop interno: cada execucao faz no maximo uma tentativa por sistema; o agendamento e do cron.
 - `retry_state.json` (estado) e `retry.log` (log do retry) sao runtime na VM, fora do git. Escrita atomica + lock local simples evitam corrida.
 
 ### 4.5.2 Catch-up das justificativas
 
-- Cada data de disparo (dia 8/21 do st com weekend shift, dia 1 do ss/eb) e um evento identificavel, registrado em `justificativa_state.json` por sistema quando cumprido.
+- Cada data de disparo (dia 7/20 do st com weekend shift, dia 1 do ss/eb) e um evento identificavel, registrado em `justificativa_state.json` por sistema quando cumprido.
 - Marca como cumprido **somente com exit 0**. Falha do monitor mantem a data pendente para a proxima execucao.
 - Janela `CATCHUP_MAX_DAYS = 5`: disparo devido e nao cumprido dentro da janela e reexecutado mesmo fora do dia exato; mais antigo que isso e descartado com log, sem envio.
 - O range avaliado deriva da **data de disparo**, nao da data corrente - requisito de corretude: um catch-up do dia 21 executado no dia 23 tem de avaliar o ciclo do dia 21.
 - Disparos distintos que resultam no mesmo range sao coalescidos num unico envio, evitando mensagens duplicadas.
 - Primeira execucao (sem state) absorve o historico anterior a janela em silencio, sem notificar retroativamente.
-- Motivo de a logica viver no script e nao no timer: `Persistent=true` recuperaria a execucao, mas o gate interno de dia do mes rejeitaria o catch-up ("hoje nao e dia 8"), tornando a recuperacao inocua.
+- Motivo de a logica viver no script e nao no timer: `Persistent=true` recuperaria a execucao, mas o gate interno de dia do mes rejeitaria o catch-up ("hoje nao e dia 7"), tornando a recuperacao inocua.
 
 ## 5. Requisitos nao-funcionais
 

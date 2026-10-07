@@ -144,6 +144,34 @@ ERR_SUFIXO = (
     "`/status st`"
 )
 
+def erro_args_extras(cmd: str, sys_key: str, extras: list[str]) -> str:
+    """Mensagem de erro para argumentos que o comando nao consome.
+
+    Existe porque o descarte silencioso devolvia "Tudo certo" sobre o periodo
+    errado: em 07/10/2026 o usuario tentou 4x `/checar st <data>` e recebeu
+    resposta positiva sem que a data fosse olhada. Falha silenciosa com resposta
+    positiva e pior que erro - gera confianca falsa.
+    """
+    extras_fmt = " ".join(f"`{e}`" for e in extras)
+    linhas = [f"⚠️ `{cmd}` nao aceita data. Ignorado: {extras_fmt}",
+              "", f"`{cmd}` sempre avalia o periodo corrente."]
+    # Se o que sobrou parece data, entrega o comando pronto para copiar.
+    try:
+        tokens = normalizar_tokens_data(extras)
+        if tokens:
+            if len(tokens) == 1:
+                d = parse_data(tokens[0])
+                linhas += ["", "Para avaliar esse dia:",
+                           f"`/forcar {d.strftime('%d/%m')} {sys_key}`"]
+            else:
+                a, b = parse_data(tokens[0]), parse_data(tokens[1])
+                linhas += ["", "Para avaliar esse periodo:",
+                           f"`/forcar {a.strftime('%d/%m')}-{b.strftime('%d/%m')} {sys_key}`"]
+    except Exception:
+        linhas += ["", "Datas so funcionam em `/forcar`. Ex.: `/forcar 23/09 st`"]
+    return "\n".join(linhas)
+
+
 def run_monitor(args: list[str], chat_id: int | None = None) -> str:
     """Roda monitor_ponto.py. Streaming de marcos + retorna resumo amigavel."""
     MARCOS = {
@@ -293,9 +321,11 @@ def handle_command(chat_id: int, text: str):
         return
 
     if cmd == "/resetar":
-        sys_key, _ = parse_args_sistema(args)
+        sys_key, extras = parse_args_sistema(args)
         if sys_key is None:
             send(chat_id, ERR_SUFIXO); return
+        if extras:
+            send(chat_id, erro_args_extras("/resetar", sys_key, extras)); return
         if not STATE.exists():
             send(chat_id, "_State vazio._")
             return
@@ -317,9 +347,11 @@ def handle_command(chat_id: int, text: str):
         return
 
     if cmd == "/checar":
-        sys_key, _ = parse_args_sistema(args)
+        sys_key, extras = parse_args_sistema(args)
         if sys_key is None:
             send(chat_id, ERR_SUFIXO); return
+        if extras:
+            send(chat_id, erro_args_extras("/checar", sys_key, extras)); return
         send(chat_id, f"_Rodando checagem de {SYS_LABELS[sys_key]}..._")
         out = run_monitor(["--system", sys_key, "--no-state", "--no-whatsapp"], chat_id=chat_id)
         send(chat_id, out)
@@ -352,9 +384,11 @@ def handle_command(chat_id: int, text: str):
         return
 
     if cmd == "/status":
-        sys_key, _ = parse_args_sistema(args)
+        sys_key, extras = parse_args_sistema(args)
         if sys_key is None:
             send(chat_id, ERR_SUFIXO); return
+        if extras:
+            send(chat_id, erro_args_extras("/status", sys_key, extras)); return
         label = SYS_LABELS[sys_key]
         if not STATE.exists():
             send(chat_id, f"_State `{label}` vazio._")

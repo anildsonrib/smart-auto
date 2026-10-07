@@ -2,9 +2,11 @@
 Notificacao de justificativa por sistema, com regras especificas e catch-up.
 
 Regras (RULES dict):
-- st  (Santi/Senior RH): dias 8 e 21 do mes, as 09h. Se cair em sex/sab/dom,
+- st  (Santi/Senior RH): dias 7 e 20 do mes, as 09h. Se cair em sex/sab/dom,
   dispara na quinta anterior E na segunda seguinte (justificativa manual,
-  exige presenca fisica).
+  exige presenca fisica). Sao DUAS entregas ao RH sobre o mesmo ciclo, com
+  cortes diferentes: dia 7 -> 21 do mes anterior ate dia 6; dia 20 -> 21 do
+  mes anterior ate dia 20.
 - ss  (Sesa/Secullum) e eb (MentorH/EBSERH): dia 1 do mes, as 16h, sem shift
   (justificativa pode ser feita online).
 
@@ -66,12 +68,20 @@ LOCK_WAIT_SECONDS = 15
 
 RULES = {
     "st": {
-        "days": [8, 21],
+        # Dias 7 e 20 (confirmado pelo usuario em 07/10/2026). Historico: nasceu
+        # como [7, 20] em b38be29, virou [8, 21] em d983ce2 a pedido do usuario,
+        # e voltou a [7, 20] - a janela real de entrega ao RH e dia 7 e dia 20.
+        "days": [7, 20],
         "weekend_shift": True,
-        # st: RH Senior fecha competencia no dia 20. Os disparos (8 e 21) cobrem o
-        # ciclo aberto = dia 20 do mes anterior ao dia 20 do mes corrente. Datas
-        # futuras sao ignoradas pelo monitor (--force-range).
-        "periodo": "ciclo20",
+        # st: a competencia do RH Senior abre no dia 21. O usuario entrega DUAS
+        # justificativas sobre o mesmo ciclo, com cortes diferentes:
+        #   disparo dia  7 -> 21 do mes anterior ate dia  6 (parcial, meio do ciclo)
+        #   disparo dia 20 -> 21 do mes anterior ate dia 20 (ciclo fechado)
+        # Por isso o fim da janela depende do DIA-ALVO da regra, nao da data do
+        # disparo (que o weekend_shift pode deslocar). Datas futuras sao
+        # ignoradas pelo monitor (--force-range).
+        "periodo": "ciclo21",
+        "janela_fim": {7: 6, 20: 20},
         "subtitulo": "Chegou o dia de fazer a justificativa de ponto em Santi RH. Verifique as pendencias abaixo:",
     },
     "ss": {
@@ -198,51 +208,66 @@ def _meses_vizinhos(hoje: date) -> list[tuple[int, int]]:
     return [(ant.year, ant.month), (hoje.year, hoje.month), (prox.year, prox.month)]
 
 
-def todas_as_datas(hoje: date, rule: dict) -> list[date]:
-    """Todas as datas de disparo da regra nos meses vizinhos, ordenadas."""
-    out = set()
+def todas_as_datas(hoje: date, rule: dict) -> list[tuple[date, int, date]]:
+    """Disparos da regra nos meses vizinhos: (data_disparo, dia_alvo, mes_alvo).
+
+    O dia-alvo viaja junto porque o `weekend_shift` desloca a data de disparo e,
+    no `st`, o fim da janela depende do alvo (7 -> dia 6; 20 -> dia 20), nao da
+    data em que a notificacao sai. `mes_alvo` (dia 1 do mes do alvo) ancora a
+    competencia mesmo se um deslocamento cruzar a virada de mes.
+    """
+    out = {}
     for year, month in _meses_vizinhos(hoje):
         for td in rule["days"]:
+            alvo_mes = date(year, month, 1)
             for d in datas_notificacao(year, month, td, rule["weekend_shift"]):
-                out.add(d)
-    return sorted(out)
+                out[d] = (d, td, alvo_mes)
+    return [out[k] for k in sorted(out)]
 
 
-def datas_pendentes(hoje: date, rule: dict, ja_feitas: set[str]) -> tuple[list[date], list[date]]:
-    """Separa datas de disparo devidas em (pendentes na janela, expiradas).
+def datas_pendentes(hoje: date, rule: dict, ja_feitas: set[str]):
+    """Separa disparos devidos em (pendentes na janela, expirados).
 
-    Devida = data <= hoje e ainda nao cumprida. Expirada = devida mas mais
-    antiga que CATCHUP_MAX_DAYS.
+    Devido = data <= hoje e ainda nao cumprido. Expirado = devido mas mais
+    antigo que CATCHUP_MAX_DAYS. Cada item e a tupla de `todas_as_datas`.
     """
     limite = hoje - timedelta(days=CATCHUP_MAX_DAYS)
     pendentes, expiradas = [], []
-    for d in todas_as_datas(hoje, rule):
+    for item in todas_as_datas(hoje, rule):
+        d = item[0]
         if d > hoje or d.isoformat() in ja_feitas:
             continue
-        (pendentes if d >= limite else expiradas).append(d)
+        (pendentes if d >= limite else expiradas).append(item)
     return pendentes, expiradas
 
 
 # ----------------------------------------------------------------------
 # PERIODO
 # ----------------------------------------------------------------------
-def periodo_range(ref: date, rule: dict) -> tuple[date, date]:
+def periodo_range(ref: date, rule: dict, dia_alvo: int | None = None,
+                  mes_alvo: date | None = None) -> tuple[date, date]:
     """Retorna (ini, fim) do range a avaliar conforme o periodo da regra.
 
-    `ref` e a DATA DE DISPARO, nao a data de hoje: num catch-up o ciclo
-    avaliado tem de ser o do disparo perdido, nao o do dia em que se percebeu.
+    `ref` e a DATA DE DISPARO, nao a data de hoje: num catch-up o ciclo avaliado
+    tem de ser o do disparo perdido, nao o do dia em que se percebeu.
+
+    `dia_alvo`/`mes_alvo` vem da regra, nao do calendario: no `st` o disparo pode
+    ser deslocado pelo weekend_shift, e o corte da janela segue o dia-alvo
+    (7 -> dia 6; 20 -> dia 20), nao a data em que a mensagem saiu.
     """
     p = rule["periodo"]
+    base = mes_alvo or ref.replace(day=1)
     if p == "mes_anterior":
         # ss/eb: mes anterior fechado (dia 1 ao ultimo dia do mes anterior)
-        fim_d = ref.replace(day=1) - timedelta(days=1)
+        fim_d = base - timedelta(days=1)
         ini_d = fim_d.replace(day=1)
-    elif p == "ciclo20":
-        # st: ciclo do RH Senior, dia 20 do mes anterior ao dia 20 do mes corrente
-        fim_d = ref.replace(day=20)
-        ini_d = (ref.replace(day=1) - timedelta(days=1)).replace(day=20)
+    elif p == "ciclo21":
+        # st: competencia abre no dia 21 do mes anterior; o fim depende do alvo.
+        ini_d = (base - timedelta(days=1)).replace(day=21)
+        fim_dia = (rule.get("janela_fim") or {}).get(dia_alvo, 20)
+        fim_d = base.replace(day=fim_dia)
     else:  # mes_corrente: dia 1 do mes corrente ate a data de referencia
-        ini_d = ref.replace(day=1)
+        ini_d = base
         fim_d = ref
     return ini_d, fim_d
 
@@ -280,26 +305,29 @@ def main() -> int:
     ja_feitas = despachados(state, args.system)
     pendentes, expiradas = datas_pendentes(hoje, rule, ja_feitas)
 
+    datas_expiradas = [it[0] for it in expiradas]
     if bootstrap:
         if expiradas:
             print(f"[init] {args.system}: state inicializado, {len(expiradas)} disparo(s) "
                   f"anteriores a janela marcados como cumpridos "
-                  f"({expiradas[0]}..{expiradas[-1]}).")
+                  f"({datas_expiradas[0]}..{datas_expiradas[-1]}).")
     else:
-        for d in expiradas:
+        for d in datas_expiradas:
             print(f"[skip] {args.system}: disparo {d} passou de {CATCHUP_MAX_DAYS} dias, "
                   f"descartado sem envio.")
     if expiradas and not args.dry_run:
-        marcar_despachados(args.system, expiradas, hoje)
+        marcar_despachados(args.system, datas_expiradas, hoje)
 
     if not pendentes:
         print(f"[skip] {hoje}: nada devido para justificativa {args.system}.")
         return 0
 
     # Coalesce: disparos distintos que avaliam o mesmo range viram um envio.
+    # No `st` os dois disparos do ciclo tem cortes diferentes (dia 6 e dia 20),
+    # entao nao coalescem - sao duas entregas distintas ao RH, como esperado.
     por_range: dict[tuple[str, str], list[date]] = {}
-    for d in pendentes:
-        ini_d, fim_d = periodo_range(d, rule)
+    for d, dia_alvo, mes_alvo in pendentes:
+        ini_d, fim_d = periodo_range(d, rule, dia_alvo, mes_alvo)
         por_range.setdefault((ini_d.isoformat(), fim_d.isoformat()), []).append(d)
 
     rc_final = 0
