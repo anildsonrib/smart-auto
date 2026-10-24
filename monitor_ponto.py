@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, date, timedelta, time
 from pathlib import Path
 
@@ -473,7 +474,8 @@ _ABSENCE_TOKENS_EB = _ABSENCE_TOKENS + ("SEM JORNADA",)
 
 def _has_absence(raw_cells, tokens=_ABSENCE_TOKENS):
     for c in raw_cells or []:
-        cu = c.upper().strip()
+        # Sem acento: o Senior escreve "Ferias" como "Férias", e "FÉRIAS" nao casava com "FERIAS".
+        cu = unicodedata.normalize("NFKD", c).encode("ascii", "ignore").decode().upper().strip()
         if any(cu == t or cu.startswith(t) for t in tokens):
             return True
     return False
